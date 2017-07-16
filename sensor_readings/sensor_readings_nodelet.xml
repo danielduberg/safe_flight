@@ -1,0 +1,7 @@
+<library path="lib/libsensor_readings_nodelet">
+    <class name="sensor_readings/SR" type="sensor_readings::SRNodelet" base_class_type="nodelet::Nodelet">
+        <description>
+            This is my nodelet.
+        </description>
+    </class>
+</library>

@@ -1,0 +1,12 @@
+<launch>
+
+  <!-- Pass in rc_config_file:=/path/to/config.yaml to change options. -->
+  <arg name="rc_config_file"
+       default="$(find controller_rc)/config/rc.yaml" />
+
+  <node pkg="controller_rc"
+        type="controller_rc_node"
+        name="controller_rc_node">
+    <rosparam file="$(arg rc_config_file)" command="load" />
+  </node>
+</launch>

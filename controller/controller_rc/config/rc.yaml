@@ -1,0 +1,27 @@
+x_min: 992
+x_max: 2015
+x_steady: 1503
+x_deadzone: 70
+
+y_min: 992
+y_max: 2015
+y_steady: 1503
+y_deadzone: 70
+
+z_min: 992
+z_max: 2014
+z_steady: 1503
+z_deadzone: 70
+
+yaw_min: 992
+yaw_max: 2015
+yaw_steady: 1503
+yaw_deadzone: 70
+
+x_channel: 2
+y_channel: 1
+z_channel: 0
+yaw_channel: 3
+
+arm_time: 1.0
+disarm_time: 1.0

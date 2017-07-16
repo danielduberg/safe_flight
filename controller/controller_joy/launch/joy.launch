@@ -1,0 +1,19 @@
+<launch>
+  <arg name="js" default="0" />
+
+  <node pkg="joy" type="joy_node" name="joy" required="True">
+	<param name="autorepeat_rate" value="100" /> <!-- Minimal update rate, Hz -->
+	<param name="dev" value="/dev/input/js$(arg js)" />
+  </node>
+
+
+  <!-- Pass in joy_config_file:=/path/to/config.yaml to change options. -->
+  <arg name="joy_config_file"
+       default="$(find controller_joy)/config/ds4.yaml" />
+
+  <node pkg="controller_joy"
+        type="controller_joy_node"
+        name="controller_joy_node">
+    <rosparam file="$(arg joy_config_file)" command="load" />
+  </node>
+</launch>

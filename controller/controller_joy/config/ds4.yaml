@@ -1,0 +1,54 @@
+# Right stick up/down
+x_axes: 5
+x_b_axes: -1
+x_f_axes: -1
+x_inverted_axes: false
+
+# Right stick left/right
+y_axes: 2
+y_l_axes: -1
+y_r_axes: -1
+y_inverted_axes: false
+
+# Left stick up/down
+z_axes: 1
+z_d_axes: -1
+z_u_axes: -1
+z_inverted_axes: false
+
+# Left stick left/right
+yaw_axes: 0
+yaw_l_axes: -1
+yaw_r_axes: -1
+yaw_inverted_axes: false
+
+arm_disarm_axes: -1
+arm_axes: -1
+disarm_axes: -1
+arm_disarm_inverted_axes: false
+
+land_lift_axes: -1
+land_axes: -1
+lift_axes: -1
+land_lift_inverted_axes: false
+
+x_b_button: -1
+x_f_button: -1
+
+y_l_button: -1
+y_r_button: -1
+
+z_d_button: -1
+z_u_button: -1
+
+yaw_l_button: -1
+yaw_r_button: -1
+
+# Option button
+arm_button: 9
+# Share button
+disarm_button: 8
+
+# X button
+land_button: 1
+lift_button: -1

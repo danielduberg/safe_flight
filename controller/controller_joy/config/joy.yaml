@@ -1,0 +1,50 @@
+# Axis
+x_axis: -1
+x_b_axis: -1
+x_f_axis: -1
+x_inverted_axes: false
+
+y_axis: -1
+y_l_axis: -1
+y_r_axis: -1
+y_inverted_axes: false
+
+z_axis: -1
+z_d_axis: -1
+z_u_axis: -1
+z_inverted_axes: false
+
+yaw_axis: -1
+yaw_l_axis: -1
+yaw_r_axis: -1
+yaw_inverted_axes: false
+
+arm_disarm_axis: -1
+arm_axis: -1
+disarm_axis: -1
+arm_disarm_inverted_axes: false
+
+land_lift_axis: -1
+land_axis: -1
+lift_axis: -1
+land_lift_inverted_axes: false
+
+
+# Buttons
+x_b_button: -1
+x_f_button: -1
+
+y_l_button: -1
+y_r_button: -1
+
+z_d_button: -1
+z_u_button: -1
+
+yaw_l_button: -1
+yaw_r_button: -1
+
+arm_button: -1
+disarm_button: -1
+
+land_button: -1
+lift_button: -1

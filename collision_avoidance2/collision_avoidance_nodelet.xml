@@ -1,0 +1,7 @@
+<library path="lib/libcollision_avoidance_nodelet">
+	<class name="collision_avoidance/CA" type="collision_avoidance::CANodelet" base_class_type="nodelet::Nodelet">
+		<description>
+			A node that does collision avoidance.
+		</description>
+	</class>
+</library>

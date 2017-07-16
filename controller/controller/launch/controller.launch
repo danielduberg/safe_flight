@@ -1,0 +1,11 @@
+<launch>
+  <!-- Pass in joy_config_file:=/path/to/config.yaml to change options. -->
+  <arg name="controller_config_file"
+       default="$(find controller)/config/controller.yaml" />
+
+  <node pkg="controller"
+        type="controller_node"
+        name="controller_node">
+    <rosparam file="$(arg controller_config_file)" command="load" />
+  </node>
+</launch>

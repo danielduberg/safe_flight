@@ -1,0 +1,20 @@
+general:
+    pub_topic: 'sensor_readings'
+    max_time: 1.0
+    frequency: 50.0
+
+drone:
+    # circle or poly
+    shape: "circle"
+    radius: 0.4
+    height: 0.2
+    # Connected order (clockwise)
+    poly_points:
+        x: [ ]
+        y: [ ]
+
+sensors:
+    sub_topics: [ '/laser/scan' ]
+    min_ranges: [ 0.06 ]
+    max_ranges: [ 60 ]
+    num_points: [ 0 ]
