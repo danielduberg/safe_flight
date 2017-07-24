@@ -83,7 +83,7 @@ void CANodelet::onInit()
 
     sensor_readings_sub_ = nh.subscribe("/sensor_readings", 1, &CANodelet::sensorReadingsCallback, this);
     collision_avoidance_sub_ = nh.subscribe("/control", 1, &CANodelet::collisionAvoidanceCallback, this);
-    current_pose_sub_ = nh.subscribe("mavros/local_position/pose", 1, &CANodelet::currentPoseCallback, this);
+    current_pose_sub_ = nh.subscribe("/mavros/local_position/pose", 1, &CANodelet::currentPoseCallback, this);
     current_velocity_sub_ = nh.subscribe("/mavros/local_position/velocity", 1, &CANodelet::currentVelocityCallback, this);
 
     collision_free_control_pub_ = nh.advertise<exjobb_msgs::Control>("collision_free_control", 1);

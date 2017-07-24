@@ -15,8 +15,10 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   roscpp
   rospy
+  safe_flight_msgs
   sensor_msgs
   std_msgs
+  tf
 )
 
 ## System dependencies are found with CMake's conventions
@@ -111,7 +113,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}_nodelet
-  CATKIN_DEPENDS cv_bridge image_transport nodelet pcl_conversions pcl_ros roscpp rospy sensor_msgs std_msgs
+  CATKIN_DEPENDS cv_bridge image_transport nodelet pcl_conversions pcl_ros roscpp rospy safe_flight_msgs sensor_msgs std_msgs
 #  DEPENDS system_lib
 )
 
@@ -131,6 +133,9 @@ include_directories(
 add_library(${PROJECT_NAME}_nodelet
   src/${PROJECT_NAME}/sensor_readings_nodelet.cpp
   src/${PROJECT_NAME}/sensor.cpp
+  src/${PROJECT_NAME}/laser_scan.cpp
+  src/${PROJECT_NAME}/disparity_image.cpp
+  src/${PROJECT_NAME}/point_cloud.cpp
 )
 
 ## Add cmake target dependencies of the library

@@ -127,14 +127,20 @@ void fly(float x, float y, float z, float yaw)
     twist.header.frame_id = "robot";
 
     // Linear
-    twist.twist.linear.x = max_x_vel * (x * std::cos(current_yaw)) - (y * std::sin(current_yaw));
-    twist.twist.linear.y = max_y_vel * (y * std::cos(current_yaw) + (x * std::sin(current_yaw)));
+    // Source: https://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/2drota.htm
+    twist.twist.linear.x = max_x_vel * ((x * std::cos(current_yaw)) - (y * std::sin(current_yaw)));
+    twist.twist.linear.y = max_y_vel * ((y * std::cos(current_yaw)) + (x * std::sin(current_yaw)));
     twist.twist.linear.z = max_z_vel * z;
 
     // Angular
     twist.twist.angular.x = 0;
     twist.twist.angular.y = 0;
     twist.twist.angular.z = max_yaw_rate * yaw;
+
+    twist.twist.linear.x = std::max(-1.0d, std::min(1.0d, twist.twist.linear.x));
+    twist.twist.linear.y = std::max(-1.0d, std::min(1.0d, twist.twist.linear.y));
+    twist.twist.linear.z = std::max(-1.0d, std::min(1.0d, twist.twist.linear.z));
+    twist.twist.angular.z = std::max(-1.0d, std::min(1.0d, twist.twist.angular.z));
 
     pub.publish(twist);
 }
@@ -146,7 +152,7 @@ void inCallback(const controller_msgs::Controller::ConstPtr & msg)
         //ROS_ERROR_STREAM("1");
         arm_disarm(false);
     }
-    else if (msg->arm)
+    else if (msg->arm && !current_state->armed)
     {
         //ROS_ERROR_STREAM("2");
         arm_disarm(true);

@@ -5,6 +5,8 @@ general:
     three_dimensions: false
     horizontal_resolution: 360
     vertical_resolution: 360
+    min_distance: 0.2
+    max_distance: 30
 
 drone:
     # circle or poly

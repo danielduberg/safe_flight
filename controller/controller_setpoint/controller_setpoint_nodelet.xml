@@ -1,0 +1,7 @@
+<library path="lib/libcontroller_setpoint_nodelet">
+    <class name="controller_setpoint/CS" type="controller_setpoint::CSNodelet" base_class_type="nodelet::Nodelet">
+        <description>
+            This is my nodelet.
+        </description>
+    </class>
+</library>

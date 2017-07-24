@@ -1,5 +1,7 @@
 #include <sensor_readings/sensor.h>
 
+#include <pcl/filters/filter.h>
+
 namespace sensor_readings
 {
     Sensor::Sensor(std::string topic)
@@ -39,9 +41,12 @@ namespace sensor_readings
 
     }
 
-    void Sensor::updateSensorReadings(pcl::PointCloud<pcl::PointXYZ> & updated_sensor_readings)
+    void Sensor::updateSensorReadings(pcl::PointCloud<pcl::PointXYZRGB> & updated_sensor_readings)
     {
         last_update_ = ros::Time::now();
+
+        std::vector<int> indices;
+        pcl::removeNaNFromPointCloud(updated_sensor_readings, updated_sensor_readings, indices);
 
         sensor_readings_ = updated_sensor_readings;
     }
@@ -57,7 +62,7 @@ namespace sensor_readings
         return (ros::Time::now() - last_update_).toSec();
     }
 
-    pcl::PointCloud<pcl::PointXYZ> Sensor::getSensorReadings()
+    pcl::PointCloud<pcl::PointXYZRGB> Sensor::getSensorReadings()
     {
         return sensor_readings_;
     }

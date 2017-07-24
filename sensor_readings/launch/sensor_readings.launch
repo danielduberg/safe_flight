@@ -9,4 +9,9 @@
     <node pkg="nodelet" type="nodelet" name="sensor_readings_nodelet" args="load sensor_readings/SR safe_flight_manager" output="screen">
         <rosparam file="$(arg sensor_readings_config_file)" command="load" />
     </node>
+    
+    
+    
+    
+    <node name="laser_scan_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 /drone /laser 10" />
 </launch>

@@ -1,9 +1,14 @@
 Header header
 
-float32 x
-float32 y
-float32 z
-float32 yaw
+float64 x
+float64 y
+float64 z
+float64 yaw
+
+# How "far" the user presses the stick
+# Only used for human operation
+# Set to 1 otherwise
+float64 magnitude
 
 bool lift
 bool land

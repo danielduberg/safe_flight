@@ -2,19 +2,197 @@
 
 #include <sensor_readings/sensor_readings_nodelet.h>
 
-#include <ros/ros.h>
-
 #include <ros/assert.h>
+
+
+#include <sensor_readings/sensor.h>
+#include <sensor_readings/laser_scan.h>
+#include <sensor_readings/disparity_image.h>
+#include <sensor_readings/point_cloud.h>
+
+#include <safe_flight_msgs/SensorReadings.h>
 
 namespace sensor_readings
 {
+    double SRNodelet::getDirection(double x, double y)
+    {
+        // Changed order of x and y
+        return std::fmod(((std::atan2(y, x) * 180 / M_PI) + 360), 360);
+    }
+
+    double SRNodelet::getDistance(double x, double y)
+    {
+        return std::sqrt((x*x) + (y*y));
+    }
+
+    void SRNodelet::publish(const ros::TimerEvent & timer)
+    {
+        //NODELET_FATAL_STREAM("1");
+        std::vector<double> x(horizontal_resolution_, 0);
+        std::vector<double> y(horizontal_resolution_, 0);
+        std::vector<double> distance(horizontal_resolution_, 0);
+        std::vector<bool> updated(horizontal_resolution_, false);
+
+        //NODELET_FATAL_STREAM("2");
+        for (size_t i = 0; i < sensors_.size(); ++i)
+        {
+            if (sensors_[i]->timeSinceLastUpdate() > max_time_)
+            {
+                // It was more than 'max_time_' second(s) ago this sensor was last updated!
+                continue;
+            }
+
+            pcl::PointCloud<pcl::PointXYZRGB> obst_points = sensors_[i]->getSensorReadings();
+
+            int last_index = -1;
+
+            for (size_t j = 0; j < obst_points.size(); ++j)
+            {
+                double direction = getDirection(obst_points[j].x, obst_points[j].y);
+
+                int index = round(direction * (horizontal_resolution_ / 360.0d));
+                index = index % horizontal_resolution_;
+
+                // Check if this is the closest point at this index
+                double current_distance = getDistance(obst_points[j].x, obst_points[j].y);
+                if (current_distance < min_distance_ || current_distance > max_distance_)
+                {
+                    continue;
+                }
+
+                if (!updated[index] || current_distance < distance[index])
+                {
+                    updated[index] = true;
+                    x[index] = obst_points[j].x;
+                    y[index] = obst_points[j].y;
+                    distance[index] = current_distance;
+                }
+
+                // Set everything in between to "far away", 0 = too far away to be seen
+                if (last_index != -1)
+                {
+                    if (std::max(last_index, index) -std::min(last_index, index) < horizontal_resolution_ / 2.0d)
+                    {
+                        for (size_t k = std::min(last_index, index); k < std::max(last_index, index); ++k)
+                        {
+                            if (!updated[k])
+                            {
+                                // Do not change this to updated!
+                                x[k] = 0;
+                                y[k] = 0;
+                                distance[k] = 0;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (size_t k = std::max(last_index, index); k < horizontal_resolution_ + std::min(last_index, index); ++k)
+                        {
+                            size_t k360 = k % 360;
+
+                            if (!updated[k360])
+                            {
+                                // Do not change this to updated!
+                                x[k360] = 0;
+                                y[k360] = 0;
+                                distance[k360] = 0;
+                            }
+                        }
+                    }
+                }
+
+                last_index = index;
+            }
+        }
+
+        safe_flight_msgs::SensorReadings output;
+        output.x = x;
+        output.y = y;
+        output.distance = distance;
+        output.horizontal_resolution = horizontal_resolution_;
+        output.vertical_resolution = vertical_resolution_;
+
+        pub_.publish(output);
+    }
+
     void SRNodelet::onInit()
     {
+        ros::NodeHandle & nh = getNodeHandle();
         ros::NodeHandle & nh_priv = getPrivateNodeHandle();
 
         init_param(nh_priv);
 
-        ros::Timer timer = nh_priv.createTimer(ros::Duration(1.0d / frequency_), publish);
+        pub_ = nh.advertise<safe_flight_msgs::SensorReadings>(pub_topic_, 1);
+
+        // Look for sensors ones every second
+        get_sensors_timer_ = nh_priv.createTimer(ros::Duration(1.0d), &SRNodelet::getSensors, this);
+
+        publish_timer_ = nh_priv.createTimer(ros::Duration(1.0d / frequency_), &SRNodelet::publish, this);
+    }
+
+    void SRNodelet::getSensors(const ros::TimerEvent & timer)
+    {
+        if (sub_topics_.size() == 0)
+        {
+            get_sensors_timer_.stop();
+            return;
+        }
+
+        ros::NodeHandle & nh = getNodeHandle();
+
+        ros::master::V_TopicInfo topic_infos;
+        ros::master::getTopics(topic_infos);
+
+        for (size_t i = 0; i < sub_topics_.size(); ++i)
+        {
+            for (size_t j = 0; j < topic_infos.size(); ++j)
+            {
+                if (sub_topics_[i] == topic_infos[j].name)
+                {
+                    if (topic_infos[j].datatype == "sensor_msgs/LaserScan")
+                    {
+                        LaserScan * sensor = new LaserScan(sub_topics_[i], min_ranges_[i], max_ranges_[i], num_points_[i]);
+                        sensors_.push_back(sensor);
+                        sensor_subs_.push_back(nh.subscribe(sub_topics_[i], 1, &LaserScan::callback, sensor));
+                        // Remove this since we are not subscribed!
+                        sub_topics_.erase(sub_topics_.begin() + i);
+                        min_ranges_.erase(min_ranges_.begin() + i);
+                        max_ranges_.erase(max_ranges_.begin() + i);
+                        num_points_.erase(num_points_.begin() + i);
+                    }
+                    else if (topic_infos[j].datatype == "stereo_msgs/DisparityImage")
+                    {
+                        DisparityImage * sensor = new DisparityImage(sub_topics_[i], min_ranges_[i], max_ranges_[i], num_points_[i]);
+                        sensors_.push_back(sensor);
+                        sensor_subs_.push_back(nh.subscribe(sub_topics_[i], 1, &DisparityImage::callback, sensor));
+                        // Remove this since we are not subscribed!
+                        sub_topics_.erase(sub_topics_.begin() + i);
+                        min_ranges_.erase(min_ranges_.begin() + i);
+                        max_ranges_.erase(max_ranges_.begin() + i);
+                        num_points_.erase(num_points_.begin() + i);
+                    }
+                    else if (topic_infos[i].datatype == "sensor_msgs/PointCloud2")
+                    {
+                        PointCloud * sensor = new PointCloud(sub_topics_[i], min_ranges_[i], max_ranges_[i], num_points_[i]);
+                        sensors_.push_back(sensor);
+                        sensor_subs_.push_back(nh.subscribe<pcl::PointCloud<pcl::PointXYZRGB> >(sub_topics_[i], 1, &PointCloud::callback, sensor));
+                        // Remove this since we are not subscribed!
+                        sub_topics_.erase(sub_topics_.begin() + i);
+                        min_ranges_.erase(min_ranges_.begin() + i);
+                        max_ranges_.erase(max_ranges_.begin() + i);
+                        num_points_.erase(num_points_.begin() + i);
+                    }
+                    else
+                    {
+                        ROS_ERROR_STREAM(topic_infos[j].datatype << " is not supported by sensor_readings");
+                        ++i; // Because we take -- next
+                    }
+
+                    --i;
+                    break;
+                }
+            }
+        }
     }
 
     void SRNodelet::init_param(ros::NodeHandle & nh)
@@ -24,6 +202,10 @@ namespace sensor_readings
         nh.param("general/max_time", max_time_, 1.0);
         nh.param("general/frequency", frequency_, 50.0);
         nh.param("general/three_dimensions", three_dimensions_, false);
+        nh.param("general/horizontal_resolution", horizontal_resolution_, 360);
+        nh.param("general/vertical_resolution", vertical_resolution_, 360);
+        nh.param("general/min_distance", min_distance_, 0.0d);
+        nh.param("general/max_distance", max_distance_, 1000.0d);
 
 
         // Drone
@@ -80,10 +262,12 @@ namespace sensor_readings
 
 
         // Sensors
-        nh.getParam("sub_topics", sub_topics_);
-        nh.getParam("min_ranges", min_ranges_);
-        nh.getParam("max_ranges", max_ranges_);
-        nh.getParam("num_points", num_points_);
+        nh.getParam("sensors/sub_topics", sub_topics_);
+        nh.getParam("sensors/min_ranges", min_ranges_);
+        nh.getParam("sensors/max_ranges", max_ranges_);
+        nh.getParam("sensors/num_points", num_points_);
+        // Less reallocations
+        sensors_.reserve(sub_topics_.size());
     }
 
 

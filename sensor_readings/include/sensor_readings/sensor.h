@@ -20,7 +20,7 @@ namespace sensor_readings
         int num_points_;
 
     private:
-        pcl::PointCloud<pcl::PointXYZ> sensor_readings_;
+        pcl::PointCloud<pcl::PointXYZRGB> sensor_readings_;
 
         ros::Time last_update_;
 
@@ -43,12 +43,12 @@ namespace sensor_readings
         double timeSinceLastUpdate();
 
         // Maybe protected?
-        void updateSensorReadings(pcl::PointCloud<pcl::PointXYZ> & updated_sensor_readings);
+        void updateSensorReadings(pcl::PointCloud<pcl::PointXYZRGB> & updated_sensor_readings);
 
         /**
          * @brief getDistances
          * @return Distances
          */
-        pcl::PointCloud<pcl::PointXYZ> getSensorReadings();
+        pcl::PointCloud<pcl::PointXYZRGB> getSensorReadings();
     };
 }

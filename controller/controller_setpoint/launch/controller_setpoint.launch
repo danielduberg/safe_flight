@@ -1,0 +1,12 @@
+<launch>
+
+  <!-- Pass in controller_setpoint_config_file:=/path/to/config.yaml to change options. -->
+  <arg name="controller_setpoint_config_file"
+       default="$(find controller_setpoint)/config/controller_setpoint.yaml" />
+
+  <node pkg="controller_setpoint"
+        type="controller_setpoint_node"
+        name="controller_setpoint_node">
+    <rosparam file="$(arg controller_setpoint_config_file)" command="load" />
+  </node>
+</launch>

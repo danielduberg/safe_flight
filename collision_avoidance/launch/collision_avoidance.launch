@@ -1,0 +1,13 @@
+<launch>
+    <node pkg="nodelet" type="nodelet" name="safe_flight_manager" args="manager" output="screen" />
+    
+    
+    <!-- Pass in collision_avoidance_config_file:=/path/to/config.yaml to change options. -->
+  <arg name="collision_avoidance_config_file"
+       default="$(find collision_avoidance)/config/collision_avoidance.yaml" />
+    
+    <node pkg="nodelet" type="nodelet" name="collision_avoidance_nodelet" args="load collision_avoidance/CA safe_flight_manager" output="screen">
+        <rosparam file="$(arg collision_avoidance_config_file)" command="load" />
+    </node>
+    
+</launch>
