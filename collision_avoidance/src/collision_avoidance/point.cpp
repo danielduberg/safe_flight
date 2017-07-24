@@ -6,7 +6,7 @@ namespace collision_avoidance
         : x_(0)
         , y_(0)
     {
-
+        return;
     }
 
     Point::Point(const double x, const double y)
