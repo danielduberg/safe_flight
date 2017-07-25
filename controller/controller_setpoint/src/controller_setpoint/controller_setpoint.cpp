@@ -13,7 +13,7 @@ namespace controller_setpoint
     {
         initParam(nh_);
 
-        controller_pub_ = nh_controller_.advertise<controller_msgs::Controller>("in", 1);
+        controller_pub_ = nh_controller_.advertise<controller_msgs::Controller>("setpoint", 1);
 
         setpoint_sub_ = nh_.subscribe("/nav_2D", 1, &ControllerSetpoint::setpointCallback, this);
         pose_sub_ = nh_.subscribe("mavros/local_position/pose", 1, &ControllerSetpoint::poseCallback, this);

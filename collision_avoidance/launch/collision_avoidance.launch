@@ -3,11 +3,25 @@
     
     
     <!-- Pass in collision_avoidance_config_file:=/path/to/config.yaml to change options. -->
-  <arg name="collision_avoidance_config_file"
+  	<arg name="collision_avoidance_config_file"
        default="$(find collision_avoidance)/config/collision_avoidance.yaml" />
     
     <node pkg="nodelet" type="nodelet" name="collision_avoidance_nodelet" args="load collision_avoidance/CA safe_flight_manager" output="screen">
         <rosparam file="$(arg collision_avoidance_config_file)" command="load" />
     </node>
+    
+    
+    
+    <arg name="sensor_readings_config_file"
+       default="$(find sensor_readings)/config/sensor_readings.yaml" />
+    
+    <node pkg="nodelet" type="nodelet" name="sensor_readings_nodelet" args="load sensor_readings/SR safe_flight_manager" output="screen">
+        <rosparam file="$(arg sensor_readings_config_file)" command="load" />
+    </node>
+    
+    
+    
+    
+    <node name="laser_scan_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 /drone /laser 10" />
     
 </launch>

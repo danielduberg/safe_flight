@@ -19,7 +19,7 @@ namespace collision_avoidance
 
         for (size_t i = 0; i < obstacles.size(); ++i)
         {
-            if (obstacles[i].x_ == -1 && obstacles[i].y_ == -1)
+            if (obstacles[i].x_ == 0 && obstacles[i].y_ == 0)
             {
                 // No reading here
                 continue;

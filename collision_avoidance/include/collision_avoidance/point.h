@@ -10,6 +10,7 @@ namespace collision_avoidance
         double x_;
         double y_;
 
+        /** Default constructor */
         Point();
 
         Point(const double x, const double y);

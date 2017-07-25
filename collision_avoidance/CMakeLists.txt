@@ -11,6 +11,8 @@ find_package(catkin REQUIRED COMPONENTS
   controller_msgs
   joy_rumble
   nodelet
+  pcl_conversions
+  pcl_ros
   roscpp
   rospy
   safe_flight_msgs
@@ -109,7 +111,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES collision_avoidance
-  CATKIN_DEPENDS controller_msgs joy_rumble nodelet roscpp rospy safe_flight_msgs std_msgs
+  CATKIN_DEPENDS controller_msgs joy_rumble nodelet pcl_conversions pcl_ros roscpp rospy safe_flight_msgs std_msgs
 #  DEPENDS system_lib
 )
 

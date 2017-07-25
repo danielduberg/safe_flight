@@ -17,7 +17,6 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
 
-
 namespace sensor_readings
 {
 
@@ -39,23 +38,32 @@ namespace sensor_readings
         float currentAngle = scan_in->angle_min - scan_in->angle_increment;
         for (size_t i = 0; i < scan_in->ranges.size(); ++i) {
             currentAngle += scan_in->angle_increment;
-            if (scan_in->ranges[i] < scan_in->range_min || scan_in->ranges[i] > scan_in->range_max) {
+            if (scan_in->ranges[i] < scan_in->range_min) {
                 // Invalid range
                 continue;
             }
 
-            if (scan_in->ranges[i] < min_range_ || scan_in->ranges[i] > max_range_)
+            if (scan_in->ranges[i] < min_range_)
             {
                 // Out of wanted range
                 continue;
             }
 
             pcl::PointXYZRGB point;
-            point.x = scan_in->ranges[i] * std::cos(currentAngle);
-            point.y = scan_in->ranges[i] * std::sin(currentAngle);
+
+            if (scan_in->ranges[i] > scan_in->range_max)
+            {
+                point.x = 10000 * std::cos(currentAngle);
+                point.y = 10000 * std::sin(currentAngle);
+            }
+            else
+            {
+                point.x = scan_in->ranges[i] * std::cos(currentAngle);
+                point.y = scan_in->ranges[i] * std::sin(currentAngle);
+            }
+
             point.z = 0;
             cloud.points.push_back(point);
-
         }
 
         // Check number of points

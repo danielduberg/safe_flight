@@ -41,10 +41,15 @@ namespace sensor_readings
         std::vector<ros::Subscriber> sensor_subs_;
         ros::Publisher pub_;
 
+
+        ros::Publisher cloud_pub_;
+
     private:
         double getDirection(double x, double y);
 
         double getDistance(double x, double y);
+
+        void init_vectors(std::vector<double> * x, std::vector<double> * y, std::vector<double> * distance);
 
         void publish(const ros::TimerEvent & timer);
 

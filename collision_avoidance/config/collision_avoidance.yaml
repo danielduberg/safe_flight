@@ -1,0 +1,14 @@
+radius: 0.4
+security_distance: 0.6
+epsilon: 0.1
+
+min_change_in_direction: -15.0
+max_change_in_direction: 45.0
+
+min_opposite_direction: 0.0
+max_opposite_direction: 10.0
+
+ab: 3.0
+T: 0.3
+
+min_distance_hold: 0.3

@@ -29,22 +29,38 @@ namespace collision_avoidance
         geometry_msgs::PoseStamped current_pose_;
 
         // Current velocity
-        double current_x_vel_, current_y_vel_;
+        double current_x_vel_;
+        double current_y_vel_;
 
         // Obstacle-Restriction Method
         ORM * orm_;
-        double radius_, security_distance_, epsilon_;
+        double radius_;
+        double security_distance_;
+        double epsilon_;
+
         // Tele-op
-        double min_change_in_direction_, max_change_in_direction_, min_opposite_direction_, max_opposite_direction_;
+        double min_change_in_direction_;
+        double max_change_in_direction_;
+        double min_opposite_direction_;
+        double max_opposite_direction_;
 
         // Ego-Dynamic Space
-        double ab_, T_;
+        double ab_;
+        double T_;
+
+        // No input
+        double min_distance_hold_;
 
         // Subscribers
-        ros::Subscriber sensor_readings_sub_, collision_avoidance_sub_, current_pose_sub_, current_velocity_sub_;
+        ros::Subscriber sensor_readings_sub_;
+        ros::Subscriber collision_avoidance_joy_sub_;
+        ros::Subscriber collision_avoidance_setpoint_sub_;
+        ros::Subscriber current_pose_sub_;
+        ros::Subscriber current_velocity_sub_;
 
         // Publishers
-        ros::Publisher collision_free_control_pub_, rumble_pub_;
+        ros::Publisher collision_free_control_pub_;
+        ros::Publisher rumble_pub_;
 
     private:
         virtual void onInit();
@@ -55,9 +71,15 @@ namespace collision_avoidance
 
         bool hapticFeedback(double want_direction, double going_direction);
 
-        void collisionAvoidanceCallback(const controller_msgs::Controller::ConstPtr & msg);
+        void collisionAvoidance(const controller_msgs::Controller::ConstPtr & msg, const double magnitude);
 
-        std::vector<Point> getEgeDynamicSpace();
+        void collisionAvoidanceSetpointCallback(const controller_msgs::Controller::ConstPtr & msg);
+
+        void collisionAvoidanceJoyCallback(const controller_msgs::Controller::Ptr & msg);
+
+        void getEgeDynamicSpace(std::vector<Point> * obstacles);
+
+        void adjustVelocity(controller_msgs::Controller * control, const double magnitude);
 
         void currentPoseCallback(const geometry_msgs::PoseStamped::ConstPtr & msg);
 

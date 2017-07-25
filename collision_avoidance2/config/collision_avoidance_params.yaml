@@ -1,8 +1,0 @@
-radius: 0.4
-# 0.4
-security_distance: 0.4
-epsilon: 0.1
-# Distance when to slow down
-max_distance_speed: 2.0
-# Minimum distance when no input is given
-min_distance_hold: 0.4

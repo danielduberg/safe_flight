@@ -20,14 +20,15 @@ namespace collision_avoidance
         double min_opposite_direction_;
         double max_opposite_direction_;
 
-
+        ros::NodeHandle nh_;
+        ros::Publisher pub_;
 
     public:
         // Done
         ORM(double radius, double security_distance, double epsilon, double min_change_in_direction, double max_change_in_direction, double min_opposite_direction, double max_opposite_direction);
 
         // Done
-        bool avoidCollision(controller_msgs::Controller * controller, const std::vector<Point> & obstacles);
+        bool avoidCollision(controller_msgs::Controller * controller, const double magnitude, const std::vector<Point> & obstacles);
 
     private:
         // Done

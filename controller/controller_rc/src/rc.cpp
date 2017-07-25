@@ -153,7 +153,7 @@ int main(int argc, char** argv)
 
     init_param(nh_priv);
 
-    pub = nh_controller.advertise<controller_msgs::Controller>("in", 1);
+    pub = nh_controller.advertise<controller_msgs::Controller>("joy", 1);
 
     ros::Subscriber rc_sub = nh.subscribe("mavros/rc/in", 1, rcCallback);
 

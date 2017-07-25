@@ -21,7 +21,12 @@ geometry_msgs::PoseStamped::ConstPtr current_pose;
 ros::ServiceClient arming_client;
 ros::ServiceClient set_mode_client;
 
-double max_x_vel, max_y_vel, max_z_vel, max_yaw_rate;
+double max_x_vel;
+double max_y_vel;
+double max_z_vel;
+double max_yaw_rate;
+
+geometry_msgs::PoseStamped hold_position;
 
 void stateCallback(const mavros_msgs::State::ConstPtr & msg)
 {
@@ -119,6 +124,8 @@ double getCurrentYaw()
 
 void fly(float x, float y, float z, float yaw)
 {
+
+
     double current_yaw = getCurrentYaw();
 
     // Move!
@@ -126,23 +133,46 @@ void fly(float x, float y, float z, float yaw)
     twist.header.stamp = ros::Time::now();
     twist.header.frame_id = "robot";
 
-    // Linear
-    // Source: https://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/2drota.htm
-    twist.twist.linear.x = max_x_vel * ((x * std::cos(current_yaw)) - (y * std::sin(current_yaw)));
-    twist.twist.linear.y = max_y_vel * ((y * std::cos(current_yaw)) + (x * std::sin(current_yaw)));
-    twist.twist.linear.z = max_z_vel * z;
+    if (x == 0 && y == 0)
+    {
+        ROS_FATAL_STREAM("x: " << hold_position.pose.position.x << " - " << current_pose->pose.position.x);
+        ROS_FATAL_STREAM("y: " << hold_position.pose.position.y << " - " << current_pose->pose.position.y);
 
-    // Angular
-    twist.twist.angular.x = 0;
-    twist.twist.angular.y = 0;
-    twist.twist.angular.z = max_yaw_rate * yaw;
+        // Linear
+        twist.twist.linear.x = hold_position.pose.position.x - current_pose->pose.position.x;
+        twist.twist.linear.y = hold_position.pose.position.y - current_pose->pose.position.y;
+        twist.twist.linear.z = max_z_vel * z;
 
-    twist.twist.linear.x = std::max(-1.0d, std::min(1.0d, twist.twist.linear.x));
-    twist.twist.linear.y = std::max(-1.0d, std::min(1.0d, twist.twist.linear.y));
-    twist.twist.linear.z = std::max(-1.0d, std::min(1.0d, twist.twist.linear.z));
-    twist.twist.angular.z = std::max(-1.0d, std::min(1.0d, twist.twist.angular.z));
+        // Angular
+        twist.twist.angular.x = 0.0;
+        twist.twist.angular.y = 0.0;
+        twist.twist.angular.z = max_yaw_rate * yaw;
 
-    pub.publish(twist);
+        pub.publish(twist);
+    }
+    else
+    {
+        // Linear
+        // Source: https://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/2drota.htm
+        twist.twist.linear.x = max_x_vel * ((x * std::cos(current_yaw)) - (y * std::sin(current_yaw)));
+        twist.twist.linear.y = max_y_vel * ((y * std::cos(current_yaw)) + (x * std::sin(current_yaw)));
+        twist.twist.linear.z = max_z_vel * z;
+
+        // Angular
+        twist.twist.angular.x = 0;
+        twist.twist.angular.y = 0;
+        twist.twist.angular.z = max_yaw_rate * yaw;
+
+        twist.twist.linear.x = std::max(-1.0d, std::min(1.0d, twist.twist.linear.x));
+        twist.twist.linear.y = std::max(-1.0d, std::min(1.0d, twist.twist.linear.y));
+        twist.twist.linear.z = std::max(-1.0d, std::min(1.0d, twist.twist.linear.z));
+        twist.twist.angular.z = std::max(-1.0d, std::min(1.0d, twist.twist.angular.z));
+
+        pub.publish(twist);
+
+        hold_position.pose.position.x = current_pose->pose.position.x;
+        hold_position.pose.position.y = current_pose->pose.position.y;
+    }
 }
 
 void inCallback(const controller_msgs::Controller::ConstPtr & msg)
@@ -202,7 +232,7 @@ int main(int argc, char** argv)
 
     ros::Subscriber pose_sub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 1, poseCallback);
 
-    ros::Subscriber control_sub = nh_controller.subscribe("in", 1, inCallback);
+    ros::Subscriber control_sub = nh.subscribe("collision_free_control", 1, inCallback);
 
     arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
 

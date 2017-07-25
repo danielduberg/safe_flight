@@ -6,7 +6,7 @@ namespace collision_avoidance
         : x_(0)
         , y_(0)
     {
-        return;
+
     }
 
     Point::Point(const double x, const double y)
@@ -20,7 +20,7 @@ namespace collision_avoidance
     {
         double x = p1.x_ - p2.x_;
         double y = p1.y_ - p2.y_;
-        return std::sqrt(std::pow(x, 2) + std::pow(y, 2));
+        return std::sqrt((x*x) + (y*y)); //std::pow(x, 2) + std::pow(y, 2));
     }
 
     /**
@@ -40,7 +40,7 @@ namespace collision_avoidance
      */
     double Point::getDirectionDegrees(const Point & p)
     {
-        float direction = getDirection(p) * 180.0d / M_PI;
+        double direction = getDirection(p) * 180.0d / M_PI;
 
         if (direction < 0)
         {

@@ -423,7 +423,7 @@ int main(int argc, char** argv)
 
     map_axes_buttons();
 
-    pub = nh_controller.advertise<controller_msgs::Controller>("in", 1);
+    pub = nh_controller.advertise<controller_msgs::Controller>("joy", 1);
 
     ros::Subscriber sub = nh.subscribe("joy", 1, controllerCallback);
 

@@ -25,13 +25,29 @@ namespace sensor_readings
         return std::sqrt((x*x) + (y*y));
     }
 
+    void SRNodelet::init_vectors(std::vector<double> * x, std::vector<double> * y, std::vector<double> * distance)
+    {
+        double degrees_per_index = (2.0d * M_PI) / x->size();
+
+        for (size_t i = 0; i < x->size(); ++i)
+        {
+            (*x)[i] = min_distance_ * std::cos(((double) i) * degrees_per_index);
+            (*y)[i] = min_distance_ * std::sin(((double) i) * degrees_per_index);
+            (*distance)[i] = min_distance_;
+        }
+    }
+
     void SRNodelet::publish(const ros::TimerEvent & timer)
     {
         //NODELET_FATAL_STREAM("1");
         std::vector<double> x(horizontal_resolution_, 0);
         std::vector<double> y(horizontal_resolution_, 0);
-        std::vector<double> distance(horizontal_resolution_, 0);
+        std::vector<double> distance(horizontal_resolution_, -1);
         std::vector<bool> updated(horizontal_resolution_, false);
+
+        init_vectors(&x, &y, &distance);
+
+        pcl::PointCloud<pcl::PointXYZ> cloud;
 
         //NODELET_FATAL_STREAM("2");
         for (size_t i = 0; i < sensors_.size(); ++i)
@@ -55,9 +71,18 @@ namespace sensor_readings
 
                 // Check if this is the closest point at this index
                 double current_distance = getDistance(obst_points[j].x, obst_points[j].y);
-                if (current_distance < min_distance_ || current_distance > max_distance_)
+                if (current_distance < min_distance_)
                 {
                     continue;
+                }
+
+                if (current_distance > max_distance_)
+                {
+                    // We cannot even see anything here :O
+                    updated[index] = true;
+                    x[index] = 0.0d;
+                    y[index] = 0.0d;
+                    distance[index] = 0.0d;
                 }
 
                 if (!updated[index] || current_distance < distance[index])
@@ -106,6 +131,8 @@ namespace sensor_readings
         }
 
         safe_flight_msgs::SensorReadings output;
+        output.header.stamp = ros::Time::now();
+        output.header.frame_id = "drone";
         output.x = x;
         output.y = y;
         output.distance = distance;
@@ -113,6 +140,19 @@ namespace sensor_readings
         output.vertical_resolution = vertical_resolution_;
 
         pub_.publish(output);
+
+        for (size_t i = 0; i < x.size(); ++i)
+        {
+            pcl::PointXYZ point;
+            point.x = x[i];
+            point.y = y[i];
+            point.z = 0;
+            cloud.push_back(point);
+        }
+
+        pcl_conversions::toPCL(ros::Time::now(), cloud.header.stamp);
+        cloud.header.frame_id = "drone";
+        cloud_pub_.publish(cloud);
     }
 
     void SRNodelet::onInit()
@@ -123,6 +163,8 @@ namespace sensor_readings
         init_param(nh_priv);
 
         pub_ = nh.advertise<safe_flight_msgs::SensorReadings>(pub_topic_, 1);
+
+        cloud_pub_ = nh.advertise<pcl::PointCloud<pcl::PointXYZ> >("cloud", 1);
 
         // Look for sensors ones every second
         get_sensors_timer_ = nh_priv.createTimer(ros::Duration(1.0d), &SRNodelet::getSensors, this);
