@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+
+<launch>
+    <node pkg="nodelet" type="nodelet" name="navigation_planner_manager" args="manager" output="screen" />
+    
+    
+    <!-- Pass in navigation_planner_config_file:=/navigation/to/config.yaml to change options. -->
+  	<arg name="navigation_planner_config_file"
+       default="$(find navigation_planner)/config/navigation_planner.yaml" />
+    
+    <node pkg="nodelet" type="nodelet" name="navigation_planner_nodelet" args="load navigation_planner_2d/NP2D navigation_planner_manager" output="screen">
+        <rosparam file="$(arg navigation_planner_config_file)" command="load" />
+    </node>
+    
+</launch>

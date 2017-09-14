@@ -1,8 +1,0 @@
-<launch>
-
-	
-	<node pkg="sensor_readings" type="sensor_readings_node" name="sensor_readings_node" > <!-- output="screen"> -->
-		<rosparam file="$(find sensor_readings)/config/sensor_readings_params.yaml" command="load" />
-	</node>
-	
-</launch>

@@ -6,6 +6,8 @@
 
 #include <collision_avoidance/point.h>
 
+#include <collision_avoidance/no_input.h>
+
 namespace collision_avoidance
 {
     // Obstacle-Restriction Method
@@ -23,9 +25,13 @@ namespace collision_avoidance
         ros::NodeHandle nh_;
         ros::Publisher pub_;
 
+        double min_distance_hold_;
+
+        NoInput no_input_;
+
     public:
         // Done
-        ORM(double radius, double security_distance, double epsilon, double min_change_in_direction, double max_change_in_direction, double min_opposite_direction, double max_opposite_direction);
+        ORM(double radius, double security_distance, double epsilon, double min_distance_hold, double min_change_in_direction, double max_change_in_direction, double min_opposite_direction, double max_opposite_direction);
 
         // Done
         bool avoidCollision(controller_msgs::Controller * controller, const double magnitude, const std::vector<Point> & obstacles);
@@ -55,13 +61,20 @@ namespace collision_avoidance
         Point motionComputation(const Point & goal, const std::vector<Point> & L);
 
         // Done
+        bool isPointInPolygon(const Point & point, const std::vector<Point> & verticies);
+
+        // Done
         bool isPointInsideRectangle(const Point & a, const Point & b, const Point & c, const Point & d, const Point & p);
+
+        // Done
+        std::vector<Point> getPointsInPolygon(const std::vector<Point> & L, const std::vector<Point> & verticies);
 
         // Done
         std::vector<Point> getPointsInRectangle(const std::vector<Point> & L, const Point & a, const Point & b, const Point & c, const Point & d);
 
         // Done
         void getRectangle(const Point & goal, double radius, Point * a, Point * b, Point * c, Point * d);
+        void getRectangle(const Point & goal, double radius, std::vector<Point> * verticies);
 
         // Done
         bool isClearPath(const Point & goal, const std::vector<Point> & L);

@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <!-- Pass in tf_broadcaster_config_file:=/path/to/config.yaml to change options. -->
+  <arg name="tf_broadcaster_config_file"
+       default="$(find tf_broadcaster)/config/tf_broadcaster.yaml" />
+
+  <node pkg="tf_broadcaster"
+        type="tf_broadcaster_node"
+        name="tf_broadcaster_node"
+        output="screen">
+    <rosparam file="$(arg tf_broadcaster_config_file)" command="load" />
+  </node>
+</launch>

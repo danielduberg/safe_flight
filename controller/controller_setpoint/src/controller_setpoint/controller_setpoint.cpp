@@ -2,7 +2,7 @@
 
 #include <controller_msgs/Controller.h>
 
-#include <tf/transform_listener.h>
+#include <tf2/utils.h>
 
 namespace controller_setpoint
 {
@@ -10,45 +10,55 @@ namespace controller_setpoint
         : nh_(nh)
         , nh_priv_(nh_priv_)
         , nh_controller_(nh_controller)
+        , tf_listener_(tf_buffer_)
     {
         initParam(nh_);
 
         controller_pub_ = nh_controller_.advertise<controller_msgs::Controller>("setpoint", 1);
 
-        setpoint_sub_ = nh_.subscribe("/nav_2D", 1, &ControllerSetpoint::setpointCallback, this);
-        pose_sub_ = nh_.subscribe("mavros/local_position/pose", 1, &ControllerSetpoint::poseCallback, this);
+        setpoint_sub_ = nh_.subscribe<geometry_msgs::PoseStamped>("/nav_2d", 1, &ControllerSetpoint::setpointCallback, this);
 
         current_setpoint_.pose.orientation.w = 1;
 
-        publish_timer_ = nh_.createTimer(ros::Duration(1.0d / frequency_), &ControllerSetpoint::publishCallback, this);
+        publish_timer_ = nh_.createTimer(ros::Duration(1.0 / frequency_), &ControllerSetpoint::publishCallback, this);
     }
 
     void ControllerSetpoint::initParam(ros::NodeHandle & nh)
     {
-        nh.param<double>("frequency", frequency_, 60);
+        nh.param<double>("frequency", frequency_, 60.0);
+
+        nh.param<std::string>("robot_base_frame", robot_base_frame_, "base_link");
     }
 
     void ControllerSetpoint::setpointCallback(const geometry_msgs::PoseStamped::ConstPtr & msg)
     {
         current_setpoint_ = *msg;
-        current_setpoint_.pose.position.z = 1;
-        current_setpoint_.header.stamp = ros::Time(0);
-    }
-
-    void ControllerSetpoint::poseCallback(const geometry_msgs::PoseStamped::ConstPtr & msg)
-    {
-        current_pose_ = *msg;
     }
 
     double ControllerSetpoint::getYaw(const geometry_msgs::Quaternion & orientation)
     {
-        double roll, pitch, yaw;
+        return tf2::getYaw(orientation);
+    }
 
-        tf2::Quaternion q(orientation.x, orientation.y, orientation.z, orientation.w);
-        tf2::Matrix3x3 m(q);
-        m.getEulerYPR(yaw, pitch, roll);
+    geometry_msgs::PoseStamped ControllerSetpoint::transformPose(const geometry_msgs::PoseStamped & pose, const std::string & to_frame)
+    {
+        geometry_msgs::TransformStamped transform;
+        try
+        {
+            transform = tf_buffer_.lookupTransform(to_frame, pose.header.frame_id, ros::Time(0));
+        }
+        catch (tf2::TransformException & ex)
+        {
+            ROS_WARN_STREAM_THROTTLE_NAMED(1, "safe_flight/controller_setpoint", ex.what());
 
-        return yaw;
+            throw ex;
+        }
+
+        geometry_msgs::PoseStamped setpoint;
+
+        tf2::doTransform(pose, setpoint, transform);
+
+        return setpoint;
     }
 
     void ControllerSetpoint::publishCallback(const ros::TimerEvent & event)
@@ -57,33 +67,40 @@ namespace controller_setpoint
 
         try
         {
-            tf_listener_.transformPose("robot_yaw", current_setpoint_, setpoint);
+            current_setpoint_.header.stamp = ros::Time::now();  // So that we get the most recent transform
+
+            setpoint = transformPose(current_setpoint_, robot_base_frame_);
         }
-        catch (tf::TransformException & ex)
+        catch (tf2::TransformException & ex)
         {
-            ROS_ERROR("%s", ex.what());
-            return;
+            // Such that we just hold position
+            setpoint.pose.position.x = 0.0;
+            setpoint.pose.position.y = 0.0;
+            setpoint.pose.position.z = 0.0;
+
+            tf2::Quaternion q = tf2::Quaternion::getIdentity();
+            setpoint.pose.orientation.x = q.x();
+            setpoint.pose.orientation.y = q.y();
+            setpoint.pose.orientation.z = q.z();
+            setpoint.pose.orientation.w = q.w();
         }
-
-        ROS_FATAL_STREAM("Position:");
-        ROS_FATAL_STREAM("\tx: " << current_setpoint_.pose.position.x << " -> " << setpoint.pose.position.x);
-        ROS_FATAL_STREAM("\ty: " << current_setpoint_.pose.position.y << " -> " << setpoint.pose.position.y);
-        ROS_FATAL_STREAM("\tz: " << current_setpoint_.pose.position.z << " -> " << setpoint.pose.position.z);
-
-        ROS_FATAL_STREAM("Orientation:");
-        ROS_FATAL_STREAM("\tx: " << current_setpoint_.pose.orientation.x << " -> " << setpoint.pose.orientation.x);
-        ROS_FATAL_STREAM("\ty: " << current_setpoint_.pose.orientation.y << " -> " << setpoint.pose.orientation.y);
-        ROS_FATAL_STREAM("\tz: " << current_setpoint_.pose.orientation.z << " -> " << setpoint.pose.orientation.z);
-        ROS_FATAL_STREAM("\tw: " << current_setpoint_.pose.orientation.w << " -> " << setpoint.pose.orientation.w);
-
 
         controller_msgs::Controller out;
+        out.header.stamp = ros::Time::now();
+        out.header.frame_id = robot_base_frame_;
 
-        out.x = setpoint.pose.position.x;
-        out.y = setpoint.pose.position.y;
-        out.z = setpoint.pose.position.z;
+        out.twist_stamped.header.stamp = ros::Time::now();
+        out.twist_stamped.header.frame_id = robot_base_frame_;
 
-        out.yaw = getYaw(setpoint.pose.orientation);
+        out.twist_stamped.twist.linear.x = setpoint.pose.position.x * 0.5;
+        out.twist_stamped.twist.linear.y = setpoint.pose.position.y * 0.5;
+        out.twist_stamped.twist.linear.z = 0.0;
+        if (std::fabs(setpoint.pose.position.z) > 0.05)
+        {
+            out.twist_stamped.twist.linear.z = setpoint.pose.position.z;
+        }
+
+        out.twist_stamped.twist.angular.z = getYaw(setpoint.pose.orientation);
 
         out.arm = true;
 

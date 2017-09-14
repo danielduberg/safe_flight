@@ -49,8 +49,8 @@ namespace sensor_readings
                 pcl::PointXYZRGB point;
                 point.z = (msg->f * msg->T) / dmat(y, x);
 
-                double u = x - (msg->image.width / 2.0d);
-                double v = y - (msg->image.height / 2.0d);
+                double u = x - (msg->image.width / 2.0);
+                double v = y - (msg->image.height / 2.0);
 
                 point.x = u * point.z / msg->f;
                 point.y = v * point.z / msg->f;
@@ -63,7 +63,7 @@ namespace sensor_readings
 
         tf::StampedTransform transform;
         try {
-            tf_listener_.lookupTransform("drone", msg->header.frame_id, ros::Time(0), transform);
+            tf_listener_.lookupTransform("base_link", msg->header.frame_id, ros::Time(0), transform);
         } catch (tf::TransformException & ex) {
             ROS_ERROR("%s", ex.what());
             return;
@@ -73,7 +73,7 @@ namespace sensor_readings
 
         pcl_ros::transformPointCloud(cloud, sensor_readings, transform);
 
-        sensor_readings.header.frame_id = "drone";
+        sensor_readings.header.frame_id = "base_link";
         pcl_conversions::toPCL(msg->header.stamp, sensor_readings.header.stamp);
 
         updateSensorReadings(sensor_readings);

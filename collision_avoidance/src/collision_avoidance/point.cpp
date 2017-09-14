@@ -40,11 +40,11 @@ namespace collision_avoidance
      */
     double Point::getDirectionDegrees(const Point & p)
     {
-        double direction = getDirection(p) * 180.0d / M_PI;
+        double direction = getDirection(p) * 180.0 / M_PI;
 
         if (direction < 0)
         {
-            return (direction + 360.0d);
+            return (direction + 360.0);
         }
 
         return direction;
@@ -55,8 +55,8 @@ namespace collision_avoidance
     {
         Point midpoint;
 
-        midpoint.x_ = (p1.x_ + p2.x_) / 2.0d;
-        midpoint.y_ = (p1.y_ + p2.y_) / 2.0d;
+        midpoint.x_ = (p1.x_ + p2.x_) / 2.0;
+        midpoint.y_ = (p1.y_ + p2.y_) / 2.0;
 
         return midpoint;
     }
@@ -74,7 +74,7 @@ namespace collision_avoidance
 
     Point Point::getPointFromVectorDegrees(const double & direction, const double & magnitude)
     {
-        return getPointFromVector(direction * M_PI / 180.0d, magnitude);
+        return getPointFromVector(direction * M_PI / 180.0, magnitude);
     }
 
     // TODO: Check so it is correct
@@ -89,7 +89,7 @@ namespace collision_avoidance
     {
         getVectorFromPoint(p, direction, magnitude);
 
-        direction *= (180.0d / M_PI);
+        direction *= (180.0 / M_PI);
     }
 
 

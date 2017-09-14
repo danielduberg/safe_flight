@@ -70,7 +70,7 @@ namespace sensor_readings
 
         tf::StampedTransform transform;
         try {
-            tf_listener_.lookupTransform("drone", scan_in->header.frame_id, ros::Time(0), transform);
+            tf_listener_.lookupTransform("base_link", scan_in->header.frame_id, ros::Time(0), transform);
         } catch (tf::TransformException & ex) {
             ROS_ERROR("%s", ex.what());
             return;
@@ -80,7 +80,7 @@ namespace sensor_readings
 
         pcl_ros::transformPointCloud(cloud, sensor_readings, transform);
 
-        sensor_readings.header.frame_id = "drone";
+        sensor_readings.header.frame_id = "base_link";
         pcl_conversions::toPCL(scan_in->header.stamp, sensor_readings.header.stamp);
 
         updateSensorReadings(sensor_readings);

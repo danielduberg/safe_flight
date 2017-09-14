@@ -1,0 +1,219 @@
+#include <path_planner/path_planner.h>
+
+#include <path_planner/d_star_lite.h>
+#include <path_planner/a_star.h>
+
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+
+namespace path_planner
+{
+
+    PathPlanner::PathPlanner(ros::NodeHandle & nh, ros::NodeHandle & nh_priv)
+        : nh_(nh)
+        , nh_priv_(nh_priv)
+        , search_algorithm_(new AStar())
+        , as_(nh_, "path_planner", boost::bind(&PathPlanner::executeCallback, this, _1), false)
+        , pose_sub_(nh.subscribe("/mavros/local_position/pose", 1, &PathPlanner::poseCallback, this))
+        , map_sub_(nh.subscribe("/map", 1, &PathPlanner::mapCallback, this))
+        , map_pub_(nh_priv_.advertise<nav_msgs::OccupancyGrid>("expanded_map", 1, true))
+        , setpoint_pub_(nh.advertise<geometry_msgs::PoseStamped>("/nav_2d", 1))
+    {
+        initParams(nh_priv_);
+
+        as_.start();
+    }
+
+    PathPlanner::~PathPlanner()
+    {
+        delete search_algorithm_;
+    }
+
+    void PathPlanner::executeCallback(const path_planner::PathPlannerGoal::ConstPtr & goal)
+    {
+        bool success = true;
+
+        // Start executing the action
+        nav_msgs::Path path = search_algorithm_->computePath(current_pose_, goal->goal, map_);
+        feedback_.path = path;
+        feedback_.path.poses.insert(feedback_.path.poses.begin(), current_pose_);   // Add the current pose
+        // publish the feedback
+        as_.publishFeedback(feedback_);
+
+        ros::Rate rate(frequency_);
+
+        while (path.poses.size() > 0)
+        {
+            // Check that preempt has not been requested by the client
+            if (as_.isPreemptRequested() || !ros::ok())
+            {
+                as_.setPreempted();
+                success = false;
+                break;
+            }
+
+            // Update path if map has been updated
+            /*
+            if (map_updated_)
+            {
+                map_updated_ = false;
+
+                path = search_algorithm_->updatePath(current_pose_, goal->goal, map_);
+
+                feedback_.path = path;
+                feedback_.path.poses.insert(feedback_.path.poses.begin(), current_pose_);   // Add the current pose
+            }
+            */
+
+            // Move along path
+            // Note that we do not need to publish this every time (once should be enough)
+            // since controller_setpoint republishes the last setpoint it got
+            setpoint_pub_.publish(path.poses[0]);
+
+            // Check if we have reached current checkpoint
+            if (reachedCheckpoint(path.poses[0]))
+            {
+                path.poses.erase(path.poses.begin());
+
+                feedback_.path = path;
+                feedback_.path.poses.insert(feedback_.path.poses.begin(), current_pose_);   // Add the current pose
+            }
+
+            // Publish the feedback
+            as_.publishFeedback(feedback_);
+
+            rate.sleep();
+        }
+
+        if (success)
+        {
+            result_.success = true;
+
+            as_.setSucceeded(result_);
+        }
+    }
+
+    double PathPlanner::getYaw(const geometry_msgs::Quaternion & orientation)
+    {
+        double roll, pitch, yaw;
+
+        tf2::Quaternion q(orientation.x, orientation.y, orientation.z, orientation.w);
+        tf2::Matrix3x3 m(q);
+        m.getEulerYPR(yaw, pitch, roll);
+
+        return yaw;
+    }
+
+    bool PathPlanner::reachedCheckpoint(const geometry_msgs::PoseStamped & checkpoint)
+    {
+        double current_yaw = getYaw(current_pose_.pose.orientation);
+        double checkpoint_yaw = getYaw(checkpoint.pose.orientation);
+
+
+        if (std::fabs(current_pose_.pose.position.z - checkpoint.pose.position.z) > altitude_error_)
+        {
+            // Need better altitude!
+            ROS_FATAL_STREAM("Need better altitude!");
+            //return false;
+        }
+
+        double yaw_diff = std::fabs(current_yaw - checkpoint_yaw);
+
+        if (yaw_diff > M_PI)
+        {
+            yaw_diff = std::fabs((2 * M_PI) - yaw_diff);
+        }
+
+        if (yaw_diff > yaw_error_)
+        {
+            // Need better orientation!
+            ROS_FATAL_STREAM("Need better orientation!");
+            return false;
+        }
+
+        if (std::sqrt(std::pow(current_pose_.pose.position.x - checkpoint.pose.position.x, 2) +
+                      std::pow(current_pose_.pose.position.y - checkpoint.pose.position.y, 2)) > position_error_)
+        {
+            // Need better position!
+            ROS_FATAL_STREAM("Need better position!");
+            return false;
+        }
+
+        return true;
+    }
+
+    void PathPlanner::poseCallback(const geometry_msgs::PoseStamped::ConstPtr & msg)
+    {
+        current_pose_ = *msg;
+    }
+
+    void PathPlanner::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr & msg)
+    {
+        // TODO: Check if map has been updated!
+        map_updated_ = true;
+
+        nav_msgs::OccupancyGrid new_map;
+        new_map.header = msg->header;
+
+        new_map.info.map_load_time = msg->info.map_load_time;
+        new_map.info.resolution = std::max(radius_, (double) msg->info.resolution);     // We do not do "upscaling"
+
+        double res_diff = msg->info.resolution / new_map.info.resolution;
+
+        new_map.info.width = msg->info.width * res_diff;
+        new_map.info.height = msg->info.height * res_diff;
+        new_map.info.origin = msg->info.origin; // TODO: Should this be changed?
+
+        for (size_t i = 0; i < new_map.info.width * new_map.info.height; ++i)
+        {
+            int8_t occupancy_probability = -1;
+
+            int new_map_row = i / new_map.info.height;
+            int new_map_column = i % new_map.info.height;
+
+            int old_map_row = new_map_row * msg->info.height / new_map.info.height;
+            int old_map_column = new_map_column * msg->info.width / new_map.info.width;
+
+            for (size_t y = -std::ceil(1.0d / res_diff); y < std::ceil(1.0d / res_diff); ++y)
+            {
+                int row = old_map_row + y;
+
+                if (row < 0 || row >= msg->info.height)
+                {
+                    continue;
+                }
+
+                for (size_t x = -std::ceil(1.0d / res_diff); x < std::ceil(1.0d / res_diff); ++x)
+                {
+                    int column = old_map_column + x;
+
+                    if (column < 0 || column >= msg->info.width)
+                    {
+                        continue;
+                    }
+
+                    // The important
+                    occupancy_probability = std::max(occupancy_probability, msg->data[(row * msg->info.height) + column]);
+                }
+            }
+
+            new_map.data.push_back(0);
+        }
+
+        map_ = new_map;
+
+        map_pub_.publish(map_);
+    }
+
+    void PathPlanner::initParams(const ros::NodeHandle & nh)
+    {
+        nh.param("altitude_error", altitude_error_, 0.1d);
+        nh.param("yaw_error", yaw_error_, 0.3d);
+        nh.param("position_error", position_error_, 0.5d);
+
+        nh.param("frequency", frequency_, 10.0d);
+
+        nh.param("radius", radius_, 0.40d);
+    }
+
+}

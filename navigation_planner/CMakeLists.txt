@@ -8,7 +8,12 @@ project(navigation_planner)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  actionlib
+  actionlib_msgs
   geometry_msgs
+  move_base_msgs
+  nodelet
+  path_planner
   roscpp
   rospy
   std_msgs
@@ -107,8 +112,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}_2d_nodelet ${PROJECT_NAME}_3d_nodelet
-  CATKIN_DEPENDS geometry_msgs roscpp rospy std_msgs tf2 tf2_ros
+  LIBRARIES ${PROJECT_NAME}_nodelet
+  CATKIN_DEPENDS actionlib actionlib_msgs geometry_msgs move_base_msgs nodelet path_planner roscpp rospy std_msgs tf2 tf2_ros
 #  DEPENDS system_lib
 )
 
@@ -124,26 +129,20 @@ include_directories(
 )
 
 ## Declare a C++ library
-add_library(${PROJECT_NAME}_2d_nodelet
-  src/navigation_planner_2d_nodelet.cpp
-  src/${PROJECT_NAME}_2d/navigation_planner_2d.cpp
-)
-add_library(${PROJECT_NAME}_3d_nodelet
-  src/navigation_planner_3d_nodelet.cpp
-  src/${PROJECT_NAME}_3d/navigation_planner_3d.cpp
+add_library(${PROJECT_NAME}_nodelet
+  src/navigation_planner_nodelet.cpp
+  src/${PROJECT_NAME}/navigation_planner.cpp
 )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-add_dependencies(${PROJECT_NAME}_2d_nodelet ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(${PROJECT_NAME}_3d_nodelet ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(${PROJECT_NAME}_nodelet ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_2d_node src/navigation_planner_2d_node.cpp src/${PROJECT_NAME}_2d/navigation_planner_2d.cpp)
-add_executable(${PROJECT_NAME}_3d_node src/navigation_planner_3d_node.cpp src/${PROJECT_NAME}_3d/navigation_planner_3d.cpp)
+add_executable(${PROJECT_NAME}_node src/navigation_planner_node.cpp src/${PROJECT_NAME}/navigation_planner.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -153,20 +152,13 @@ add_executable(${PROJECT_NAME}_3d_node src/navigation_planner_3d_node.cpp src/${
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(${PROJECT_NAME}_2d_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(${PROJECT_NAME}_3d_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}_2d_nodelet
+target_link_libraries(${PROJECT_NAME}_nodelet
   ${catkin_LIBRARIES}
 )
-target_link_libraries(${PROJECT_NAME}_3d_nodelet
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(${PROJECT_NAME}_2d_node
-  ${catkin_LIBRARIES}
-)
-target_link_libraries(${PROJECT_NAME}_3d_node
+target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
 )
 
@@ -185,7 +177,7 @@ target_link_libraries(${PROJECT_NAME}_3d_node
 # )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS ${PROJECT_NAME}_2d_nodelet ${PROJECT_NAME}_3d_nodelet ${PROJECT_NAME}_2d_node ${PROJECT_NAME}_3d_node
+install(TARGETS ${PROJECT_NAME}_nodelet ${PROJECT_NAME}_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

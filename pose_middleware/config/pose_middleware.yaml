@@ -1,0 +1,4 @@
+source_frame: map
+target_frame: base_link
+out_topic: /mavros/mocap/pose
+frequency: 30

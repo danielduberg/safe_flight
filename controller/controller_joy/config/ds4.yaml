@@ -1,11 +1,11 @@
 # Right stick up/down
-x_axes: 5
+x_axes: 4
 x_b_axes: -1
 x_f_axes: -1
 x_inverted_axes: false
 
 # Right stick left/right
-y_axes: 2
+y_axes: 3
 y_l_axes: -1
 y_r_axes: -1
 y_inverted_axes: false

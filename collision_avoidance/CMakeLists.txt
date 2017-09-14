@@ -10,6 +10,7 @@ project(collision_avoidance)
 find_package(catkin REQUIRED COMPONENTS
   controller_msgs
   joy_rumble
+  nav_msgs
   nodelet
   pcl_conversions
   pcl_ros
@@ -17,6 +18,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   safe_flight_msgs
   std_msgs
+  tf2
+  tf2_ros
 )
 
 ## System dependencies are found with CMake's conventions

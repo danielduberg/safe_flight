@@ -7,5 +7,7 @@
         type="controller_node"
         name="controller_node">
     <rosparam file="$(arg controller_config_file)" command="load" />
+    <!-- <remap from="collision_free_control" to="controller/setpoint" /> -->
+    <!-- <remap from="collision_free_control" to="controller/joy" /> -->
   </node>
 </launch>

@@ -29,7 +29,7 @@ namespace collision_avoidance
 
             if (distance <= radius_ + min_distance_hold_)
             {
-                double direction = Point::getDirectionDegrees(obstacles[i]) + 180.0d;
+                double direction = Point::getDirectionDegrees(obstacles[i]) + 180.0;
                 if (direction >= 360)
                 {
                     direction -= 360;
@@ -46,8 +46,8 @@ namespace collision_avoidance
             }
         }
 
-        control->x = (x_min + x_max) / 2.0d;
-        control->y = (y_min + y_max) / 2.0d;
+        control->twist_stamped.twist.linear.x = (x_min + x_max) / 2.0;
+        control->twist_stamped.twist.linear.y = (y_min + y_max) / 2.0;
 
         /*
         if (x_min == 10000 && y_min == 10000)

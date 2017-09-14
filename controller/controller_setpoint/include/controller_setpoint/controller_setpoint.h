@@ -6,7 +6,7 @@
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
-#include <tf/transform_listener.h>
+#include <tf2_ros/transform_listener.h>
 
 namespace controller_setpoint
 {
@@ -18,7 +18,6 @@ namespace controller_setpoint
         ros::NodeHandle nh_controller_;
 
         ros::Subscriber setpoint_sub_;
-        ros::Subscriber pose_sub_;
 
         ros::Publisher controller_pub_;
 
@@ -30,7 +29,11 @@ namespace controller_setpoint
 
         // Drone
         geometry_msgs::PoseStamped current_pose_;
-        tf::TransformListener tf_listener_;
+
+        tf2_ros::Buffer tf_buffer_;
+        tf2_ros::TransformListener tf_listener_;
+
+        std::string robot_base_frame_;
 
 
     public:
@@ -41,7 +44,7 @@ namespace controller_setpoint
 
         void setpointCallback(const geometry_msgs::PoseStamped::ConstPtr & msg);
 
-        void poseCallback(const geometry_msgs::PoseStamped::ConstPtr & msg);
+        geometry_msgs::PoseStamped transformPose(const geometry_msgs::PoseStamped & pose, const std::string & to_frame);
 
         double getYaw(const geometry_msgs::Quaternion & orientation);
 

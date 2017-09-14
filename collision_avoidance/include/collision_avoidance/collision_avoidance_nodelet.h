@@ -10,6 +10,8 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
 
+#include <nav_msgs/Odometry.h>
+
 #include <safe_flight_msgs/SensorReadings.h>
 #include <controller_msgs/Controller.h>
 
@@ -55,8 +57,9 @@ namespace collision_avoidance
         ros::Subscriber sensor_readings_sub_;
         ros::Subscriber collision_avoidance_joy_sub_;
         ros::Subscriber collision_avoidance_setpoint_sub_;
-        ros::Subscriber current_pose_sub_;
-        ros::Subscriber current_velocity_sub_;
+        //ros::Subscriber current_pose_sub_;
+        //ros::Subscriber current_velocity_sub_;
+        ros::Subscriber odometry_sub_;
 
         // Publishers
         ros::Publisher collision_free_control_pub_;
@@ -81,9 +84,13 @@ namespace collision_avoidance
 
         void adjustVelocity(controller_msgs::Controller * control, const double magnitude);
 
-        void currentPoseCallback(const geometry_msgs::PoseStamped::ConstPtr & msg);
+        //void currentPoseCallback(const geometry_msgs::PoseStamped::ConstPtr & msg);
 
-        void currentVelocityCallback(const geometry_msgs::TwistStamped::ConstPtr & msg);
+        //double getCurrentYaw();
+
+        //void currentVelocityCallback(const geometry_msgs::TwistStamped::ConstPtr & msg);
+
+        void odometryCallback(const nav_msgs::Odometry::ConstPtr & msg);
     };
     
 }

@@ -1,0 +1,8 @@
+# Goal definition
+geometry_msgs/PoseStamped goal
+---
+# Result definition
+bool success
+---
+# Feedback
+nav_msgs/Path path

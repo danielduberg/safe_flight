@@ -27,13 +27,14 @@ namespace sensor_readings
 
     void SRNodelet::init_vectors(std::vector<double> * x, std::vector<double> * y, std::vector<double> * distance)
     {
-        double degrees_per_index = (2.0d * M_PI) / x->size();
+        double degrees_per_index = (2.0 * M_PI) / x->size();
 
         for (size_t i = 0; i < x->size(); ++i)
         {
-            (*x)[i] = min_distance_ * std::cos(((double) i) * degrees_per_index);
-            (*y)[i] = min_distance_ * std::sin(((double) i) * degrees_per_index);
-            (*distance)[i] = min_distance_;
+          (*distance)[i] = 3.0 * min_distance_;
+            (*x)[i] = (*distance)[i] * std::cos(((double) i) * degrees_per_index);
+            (*y)[i] = (*distance)[i] * std::sin(((double) i) * degrees_per_index);
+
         }
     }
 
@@ -66,7 +67,7 @@ namespace sensor_readings
             {
                 double direction = getDirection(obst_points[j].x, obst_points[j].y);
 
-                int index = round(direction * (horizontal_resolution_ / 360.0d));
+                int index = round(direction * (horizontal_resolution_ / 360.0));
                 index = index % horizontal_resolution_;
 
                 // Check if this is the closest point at this index
@@ -80,9 +81,9 @@ namespace sensor_readings
                 {
                     // We cannot even see anything here :O
                     updated[index] = true;
-                    x[index] = 0.0d;
-                    y[index] = 0.0d;
-                    distance[index] = 0.0d;
+                    x[index] = 0.0;
+                    y[index] = 0.0;
+                    distance[index] = 0.0;
                 }
 
                 if (!updated[index] || current_distance < distance[index])
@@ -96,7 +97,7 @@ namespace sensor_readings
                 // Set everything in between to "far away", 0 = too far away to be seen
                 if (last_index != -1)
                 {
-                    if (std::max(last_index, index) -std::min(last_index, index) < horizontal_resolution_ / 2.0d)
+                    if (std::max(last_index, index) -std::min(last_index, index) < horizontal_resolution_ / 2.0)
                     {
                         for (size_t k = std::min(last_index, index); k < std::max(last_index, index); ++k)
                         {
@@ -132,7 +133,7 @@ namespace sensor_readings
 
         safe_flight_msgs::SensorReadings output;
         output.header.stamp = ros::Time::now();
-        output.header.frame_id = "drone";
+        output.header.frame_id = "base_link";
         output.x = x;
         output.y = y;
         output.distance = distance;
@@ -151,7 +152,7 @@ namespace sensor_readings
         }
 
         pcl_conversions::toPCL(ros::Time::now(), cloud.header.stamp);
-        cloud.header.frame_id = "drone";
+        cloud.header.frame_id = "base_link";
         cloud_pub_.publish(cloud);
     }
 
@@ -167,15 +168,16 @@ namespace sensor_readings
         cloud_pub_ = nh.advertise<pcl::PointCloud<pcl::PointXYZ> >("cloud", 1);
 
         // Look for sensors ones every second
-        get_sensors_timer_ = nh_priv.createTimer(ros::Duration(1.0d), &SRNodelet::getSensors, this);
+        get_sensors_timer_ = nh_priv.createTimer(ros::Duration(1.0), &SRNodelet::getSensors, this);
 
-        publish_timer_ = nh_priv.createTimer(ros::Duration(1.0d / frequency_), &SRNodelet::publish, this);
+        publish_timer_ = nh_priv.createTimer(ros::Duration(1.0 / frequency_), &SRNodelet::publish, this);
     }
 
     void SRNodelet::getSensors(const ros::TimerEvent & timer)
     {
         if (sub_topics_.size() == 0)
         {
+          // We have found all sensors, stop looking
             get_sensors_timer_.stop();
             return;
         }
@@ -185,7 +187,7 @@ namespace sensor_readings
         ros::master::V_TopicInfo topic_infos;
         ros::master::getTopics(topic_infos);
 
-        for (size_t i = 0; i < sub_topics_.size(); ++i)
+        for (int i = sub_topics_.size() - 1; i >= 0; --i)
         {
             for (size_t j = 0; j < topic_infos.size(); ++j)
             {
@@ -196,41 +198,30 @@ namespace sensor_readings
                         LaserScan * sensor = new LaserScan(sub_topics_[i], min_ranges_[i], max_ranges_[i], num_points_[i]);
                         sensors_.push_back(sensor);
                         sensor_subs_.push_back(nh.subscribe(sub_topics_[i], 1, &LaserScan::callback, sensor));
-                        // Remove this since we are not subscribed!
-                        sub_topics_.erase(sub_topics_.begin() + i);
-                        min_ranges_.erase(min_ranges_.begin() + i);
-                        max_ranges_.erase(max_ranges_.begin() + i);
-                        num_points_.erase(num_points_.begin() + i);
                     }
                     else if (topic_infos[j].datatype == "stereo_msgs/DisparityImage")
                     {
                         DisparityImage * sensor = new DisparityImage(sub_topics_[i], min_ranges_[i], max_ranges_[i], num_points_[i]);
                         sensors_.push_back(sensor);
                         sensor_subs_.push_back(nh.subscribe(sub_topics_[i], 1, &DisparityImage::callback, sensor));
-                        // Remove this since we are not subscribed!
-                        sub_topics_.erase(sub_topics_.begin() + i);
-                        min_ranges_.erase(min_ranges_.begin() + i);
-                        max_ranges_.erase(max_ranges_.begin() + i);
-                        num_points_.erase(num_points_.begin() + i);
                     }
                     else if (topic_infos[i].datatype == "sensor_msgs/PointCloud2")
                     {
                         PointCloud * sensor = new PointCloud(sub_topics_[i], min_ranges_[i], max_ranges_[i], num_points_[i]);
                         sensors_.push_back(sensor);
                         sensor_subs_.push_back(nh.subscribe<pcl::PointCloud<pcl::PointXYZRGB> >(sub_topics_[i], 1, &PointCloud::callback, sensor));
-                        // Remove this since we are not subscribed!
-                        sub_topics_.erase(sub_topics_.begin() + i);
-                        min_ranges_.erase(min_ranges_.begin() + i);
-                        max_ranges_.erase(max_ranges_.begin() + i);
-                        num_points_.erase(num_points_.begin() + i);
                     }
                     else
                     {
-                        ROS_ERROR_STREAM(topic_infos[j].datatype << " is not supported by sensor_readings");
-                        ++i; // Because we take -- next
+                        ROS_ERROR("%s is not supported by sensor_readings", topic_infos[j].datatype.c_str());
                     }
 
-                    --i;
+                    // Remove this since we have found it!
+                    sub_topics_.erase(sub_topics_.begin() + i);
+                    min_ranges_.erase(min_ranges_.begin() + i);
+                    max_ranges_.erase(max_ranges_.begin() + i);
+                    num_points_.erase(num_points_.begin() + i);
+
                     break;
                 }
             }
@@ -246,8 +237,8 @@ namespace sensor_readings
         nh.param("general/three_dimensions", three_dimensions_, false);
         nh.param("general/horizontal_resolution", horizontal_resolution_, 360);
         nh.param("general/vertical_resolution", vertical_resolution_, 360);
-        nh.param("general/min_distance", min_distance_, 0.0d);
-        nh.param("general/max_distance", max_distance_, 1000.0d);
+        nh.param("general/min_distance", min_distance_, 0.0);
+        nh.param("general/max_distance", max_distance_, 1000.0);
 
 
         // Drone
@@ -275,7 +266,7 @@ namespace sensor_readings
         switch (shape_)
         {
         case circle:
-            nh.param("drone/radius", radius_, 0.0d);
+            nh.param("drone/radius", radius_, 0.0);
 
             break;
         case poly:
@@ -300,7 +291,7 @@ namespace sensor_readings
             break;
         }
 
-        nh.param("drone/height", height_, 0.0d);
+        nh.param("drone/height", height_, 0.0);
 
 
         // Sensors
@@ -314,5 +305,5 @@ namespace sensor_readings
 
 
 
-    PLUGINLIB_DECLARE_CLASS(sensor_readings, SR, sensor_readings::SRNodelet, nodelet::Nodelet);
+    PLUGINLIB_DECLARE_CLASS(sensor_readings, SR, sensor_readings::SRNodelet, nodelet::Nodelet)
 }

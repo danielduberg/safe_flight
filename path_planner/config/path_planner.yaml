@@ -1,0 +1,13 @@
+altitude_error: 0.1
+yaw_error: 0.1
+position_error: 0.1
+
+frequency: 10.0
+
+radius: 0.4
+altitude: 0.7
+
+max_xy_setpoint_velocity: 0.05
+max_z_setpoint_velocity: 0.05
+max_yaw_setpoint_rate: 0.05
+

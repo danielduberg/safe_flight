@@ -5,21 +5,21 @@ general:
     three_dimensions: false
     horizontal_resolution: 360
     vertical_resolution: 360
-    min_distance: 0.45
+    min_distance: 0.42
     max_distance: 30
 
 drone:
     # circle or poly
     shape: "circle"
-    radius: 0.4
-    height: 0.2
+    radius: 0.21
+    height: 0.36
     # Connected order (clockwise)
     poly_points:
         x: [ ]
         y: [ ]
 
 sensors:
-    sub_topics: [ '/laser/scan' ]
-    min_ranges: [ 0.06 ]
+    sub_topics: [ '/scan' ]
+    min_ranges: [ 0.21 ]
     max_ranges: [ 60 ]
     num_points: [ 0 ]

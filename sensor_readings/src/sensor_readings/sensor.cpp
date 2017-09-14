@@ -10,7 +10,7 @@ namespace sensor_readings
 
     }
 
-    Sensor::Sensor(std::string topic, double min_range = 0.0d, double max_range = std::numeric_limits<double>::infinity(), int num_points = 0)
+    Sensor::Sensor(std::string topic, double min_range = 0.0, double max_range = std::numeric_limits<double>::infinity(), int num_points = 0)
         : topic_(topic)
         , min_range_(min_range)
         , max_range_(max_range)

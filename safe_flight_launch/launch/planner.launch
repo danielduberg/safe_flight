@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+
+<launch>
+
+    <include file="$(find path_planner)/launch/path_planner.launch" />
+    
+    <node pkg="navigation_planner" type="navigation_planner_node" name="navigation_planner" output="screen"/>
+
+</launch>

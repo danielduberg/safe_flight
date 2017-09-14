@@ -12,7 +12,7 @@ namespace collision_avoidance
 
     double radiansToDegrees(double r)
     {
-        r *= 180.0d / M_PI;
+        r *= 180.0 / M_PI;
 
         if (r < 0)
         {
@@ -22,55 +22,87 @@ namespace collision_avoidance
         return r;
     }
 
-    ORM::ORM(double radius, double security_distance, double epsilon, double min_change_in_direction, double max_change_in_direction, double min_opposite_direction, double max_opposite_direction)
+    ORM::ORM(double radius, double security_distance, double epsilon, double min_distance_hold, double min_change_in_direction, double max_change_in_direction, double min_opposite_direction, double max_opposite_direction)
         : radius_(radius)
         , security_distance_(security_distance)
         , epsilon_(epsilon)
+        , min_distance_hold_(min_distance_hold)
         , min_change_in_direction_(min_change_in_direction)
         , max_change_in_direction_(max_change_in_direction)
         , min_opposite_direction_(min_opposite_direction)
         , max_opposite_direction_(max_opposite_direction)
+        , no_input_(NoInput(radius, security_distance, min_distance_hold))
     {
         pub_ = nh_.advertise<pcl::PointCloud<pcl::PointXYZI> >("point", 1);
     }
 
     bool ORM::avoidCollision(controller_msgs::Controller * controller, const double magnitude, const std::vector<Point> & obstacles)
     {
-        if (controller->x == 0 && controller->y == 0)
+        if (controller->twist_stamped.twist.linear.x == 0 && controller->twist_stamped.twist.linear.y == 0)
         {
             // Nothing to do!
             // TODO: No input?
+            no_input_.avoidCollision(controller, obstacles);
             return true;
         }
 
-        Point goal(controller->x, controller->y);
+        Point goal(controller->twist_stamped.twist.linear.x, controller->twist_stamped.twist.linear.y);
 
         // A. The Subgoal Selector
         goal = subgoalSelector(goal, magnitude, obstacles);
 
         pcl::PointCloud<pcl::PointXYZI> cloud;
-        pcl::PointXYZI point;
-        point.x = goal.x_;
-        point.y = goal.y_;
-        point.z = 0.0d;
-        point.intensity = 0.5d;
-        cloud.points.push_back(point);
-        cloud.header.frame_id = "drone";
-        pcl_conversions::toPCL(ros::Time::now(), cloud.header.stamp);
-        pub_.publish(cloud);
+        /*
+        {
+            pcl::PointXYZI point;
+            point.x = goal.x_;
+            point.y = goal.y_;
+            point.z = 0.0;
+            point.intensity = 0.5;
+            cloud.points.push_back(point);
+        }
+        */
+
+        controller->twist_stamped.twist.linear.x = goal.x_;
+        controller->twist_stamped.twist.linear.y = goal.y_;
 
         if (goal.x_ == 0 && goal.y_ == 0)
         {
             // Could not find any good command :(
             // TODO: No input?
+            no_input_.avoidCollision(controller, obstacles);
             return false;
         }
 
         // B. Motion Computation
-        //goal = motionComputation(goal, obstacles);
+        goal = motionComputation(goal, obstacles);
 
-        controller->x = goal.x_;
-        controller->y = goal.y_;
+        controller->twist_stamped.twist.linear.x = goal.x_;
+        controller->twist_stamped.twist.linear.y = goal.y_;
+
+        {
+            pcl::PointXYZI point;
+            point.x = goal.x_;
+            point.y = goal.y_;
+            point.z = 0.0;
+            point.intensity = 0.8;
+            cloud.points.push_back(point);
+        }
+        /*
+        for (size_t i = 0; i < obstacles.size(); ++i)
+        {
+            pcl::PointXYZI point;
+            point.x = obstacles[i].x_;
+            point.y = obstacles[i].y_;
+            point.z = 0.0;
+            point.intensity = 0.2;
+            cloud.points.push_back(point);
+        }
+        */
+
+        cloud.header.frame_id = "base_link";
+        pcl_conversions::toPCL(ros::Time::now(), cloud.header.stamp);
+        pub_.publish(cloud);
 
         return true;
     }
@@ -82,35 +114,22 @@ namespace collision_avoidance
 
     Point ORM::subgoalSelector(const Point & goal, double magnitude, const std::vector<Point> & L)
     {
-        for (int i = 0; i < L.size(); ++i)
-        {
-            for (int j = -1; j < 2; j += 2)
-            {
-                if (Point::getDistance(L[i], L[mod(i + j, L.size())]) > 0.1)
-                {
-                    //ROS_FATAL_STREAM("[" << i << ", " << mod(i + j, L.size()) << "]: " << Point::getDistance(L[i], L[mod(i + j, L.size())]));
-                }
-            }
-        }
-
         if (isClearPath(goal, L))
         {
             // We can go where we want
             return goal;
         }
 
-        double degrees_per_index = 360.0d / L.size();
+        double degrees_per_index = 360.0 / L.size();
 
-        int wanted_index = Point::getDirection(goal) / degrees_per_index;
+        int wanted_index = Point::getDirectionDegrees(goal) / degrees_per_index;
 
-        double change_in_direction = ((max_change_in_direction_ - min_change_in_direction_) * magnitude) + min_change_in_direction_;
-        double opposite_direction = ((max_opposite_direction_ - min_opposite_direction_) * (1.0d - magnitude)) + min_opposite_direction_;
+        double change_in_direction = ((max_change_in_direction_ - min_change_in_direction_) * magnitude) + min_change_in_direction_; // 180;
+        double opposite_direction = 0; //((max_opposite_direction_ - min_opposite_direction_) * (1.0 - magnitude)) + min_opposite_direction_; // 0;
 
         int right_sub_goal = -1, left_sub_goal = -1;
 
         Point sub_goal;
-
-        ROS_FATAL_STREAM("NYYYYYYY");
 
         // We cannot go directly towards where we "want", so find a subgoal
         // Look for subgoals close to goal
@@ -119,13 +138,13 @@ namespace collision_avoidance
             if (right_sub_goal != -1 && (i - right_sub_goal) * degrees_per_index > opposite_direction)
             {
                 // Return the subgoal that is to the right
-                //return sub_goal;
+                return sub_goal;
             }
 
             if (left_sub_goal != -1 && (i - left_sub_goal) * degrees_per_index > opposite_direction)
             {
                 // Return the subgoal that is to the left
-                //return sub_goal;
+                return sub_goal;
             }
 
             for (int j = -1; j < 2; j += 2)
@@ -133,12 +152,12 @@ namespace collision_avoidance
                 if (left_sub_goal != -1 && j == -1)
                 {
                     // Have already found a subgoal to the left
-                    //continue;
+                    continue;
                 }
                 if (right_sub_goal != -1 && j == 1)
                 {
                     // Have already found a subgoal to the right
-                    //continue;
+                    continue;
                 }
 
                 int current_index = mod(wanted_index + (i * j), L.size());
@@ -156,33 +175,21 @@ namespace collision_avoidance
                     bool found_sub_goal = false;
                     Point temp_sub_goal;
 
-                    if ((next_to_index == 224 && current_index == 225) || (next_to_index == 225 && current_index == 224))
-                    {
-                        //ROS_FATAL_STREAM(Point::getDistance(L[current_index], L[next_to_index]));
-                    }
-
-                    ROS_FATAL_STREAM(current_index << ", " << next_to_index << ", " << i);
-
                     if (L[next_to_index].x_ == 0 && L[next_to_index].y_ == 0)
                     {
                         // Subgoal at the edge of an obstacle
                         //ROS_FATAL_STREAM("Edge of obstacle");
                         double direction = getMidDirection(current_index * degrees_per_index, next_to_index * degrees_per_index);
-                        double distance = Point::getDistance(L[current_index]) + (radius_ * 2.0d) + epsilon_;
+                        double distance = Point::getDistance(L[current_index]) + (radius_ * 2.0) + epsilon_;
 
                         temp_sub_goal = Point::getPointFromVectorDegrees(direction, distance);
                         found_sub_goal = true;
                     }
-                    else if (Point::getDistance(L[current_index], L[next_to_index]) > 2.0d * radius_)
+                    else if (Point::getDistance(L[current_index], L[next_to_index]) > 2.0 * radius_)
                     {
                         //ROS_FATAL_STREAM("Between obstacles");
                         temp_sub_goal = Point::getMidpoint(L[current_index], L[next_to_index]);
                         found_sub_goal = true;
-                    }
-
-                    if (Point::getDistance(L[current_index], L[next_to_index]) > 0.1)
-                    {
-                        //ROS_FATAL_STREAM(Point::getDistance(L[current_index], L[next_to_index]));
                     }
 
                     if (found_sub_goal && isClearPath(temp_sub_goal, L))
@@ -191,11 +198,11 @@ namespace collision_avoidance
                         // Do not know which one to pick so go with goal instead
                         if (right_sub_goal != -1 && j == -1)
                         {
-                            //return goal;
+                            return goal;
                         }
                         else if (left_sub_goal != -1 && j == 1)
                         {
-                            //return goal;
+                            return goal;
                         }
 
                         if (j == -1)
@@ -208,7 +215,7 @@ namespace collision_avoidance
                         }
 
                         sub_goal = temp_sub_goal;
-                        //return sub_goal;
+                        return sub_goal;
                     }
                 }
             }
@@ -232,16 +239,27 @@ namespace collision_avoidance
 
         findPotentialAB(L, goal, &A, &B);
 
+        // Corners of the rectangle (tunnel)
+        std::vector<Point> rectangle;
+        //Point a, b, c, d;
+
+        // 2 * radius because then all obstacles that matters will be inside the rectangle
+        //getRectangle(goal, 2.0d * radius_, &a, &b, &c, &d);
+        getRectangle(goal, 2.0 * radius_, &rectangle);
+
+        A = getPointsInPolygon(A, rectangle); //getPointsInRectangle(A, a, b, c, d);
+        B = getPointsInPolygon(B, rectangle); //getPointsInRectangle(B, a, b, c, d);
+
         /*
         pcl::PointCloud<pcl::PointXYZI> cloud;
-        cloud.header.frame_id = "drone";
+        cloud.header.frame_id = "base_link";
         pcl_conversions::toPCL(ros::Time::now(), cloud.header.stamp);
         {
             pcl::PointXYZI point;
             point.x = goal.x_;
             point.y = goal.y_;
-            point.z = 0.0d;
-            point.intensity = 0.5d;
+            point.z = 0.0;
+            point.intensity = 0.5;
             cloud.points.push_back(point);
         }
         for (size_t i = 0; i < A.size(); ++i)
@@ -249,8 +267,8 @@ namespace collision_avoidance
             pcl::PointXYZI point;
             point.x = A[i].x_;
             point.y = A[i].y_;
-            point.z = 0.0d;
-            point.intensity = 0.2d;
+            point.z = 0.0;
+            point.intensity = 0.2;
             cloud.points.push_back(point);
         }
         for (size_t i = 0; i < B.size(); ++i)
@@ -258,22 +276,12 @@ namespace collision_avoidance
             pcl::PointXYZI point;
             point.x = B[i].x_;
             point.y = B[i].y_;
-            point.z = 0.0d;
-            point.intensity = 0.65d;
+            point.z = 0.0;
+            point.intensity = 0.65;
             cloud.points.push_back(point);
         }
         pub_.publish(cloud);
         */
-
-        // Corners of the rectangle (tunnel)
-        Point a, b, c, d;
-
-        // 2 * radius because then all obstacles that matters will be inside the rectangle
-        getRectangle(goal, 2.0d * radius_, &a, &b, &c, &d);
-
-        A = getPointsInRectangle(A, a, b, c, d);
-        B = getPointsInRectangle(B, a, b, c, d);
-
 
 
         // Check if path is clear
@@ -281,7 +289,7 @@ namespace collision_avoidance
         {
             for (size_t j = 0; j < B.size(); ++j)
             {
-                if (Point::getDistance(A[i], B[j]) < 2.0d * radius_)
+                if (Point::getDistance(A[i], B[j]) < 2.0 * radius_)
                 {
                     return false;
                 }
@@ -293,12 +301,12 @@ namespace collision_avoidance
 
     void ORM::findPotentialAB(const std::vector<Point> & L, const Point & goal, std::vector<Point> * A, std::vector<Point> * B)
     {
-        double degrees_per_index = 360.0d / L.size();
+        double degrees_per_index = 360.0 / L.size();
 
         int goal_index = Point::getDirectionDegrees(goal) / degrees_per_index;
 
         // Why 45? :O
-        for (int i = 1; i * degrees_per_index < 45; ++i)
+        for (int i = 1; i * degrees_per_index < 90; ++i)
         {
             for (int j = -1; j < 2; j += 2)
             {
@@ -325,6 +333,36 @@ namespace collision_avoidance
     }
 
     // Source: http://stackoverflow.com/questions/2825412/draw-a-parallel-line
+    void ORM::getRectangle(const Point & goal, double radius, std::vector<Point> * verticies)
+    {
+        /*
+        double x1 = 0.0d;
+        double x2 = goal.x_;
+        double y1 = 0.0d;
+        double y2 = goal.y_;
+
+        double L = distance...;
+
+        */
+
+
+        double distance = Point::getDistance(goal);
+
+        double dx = goal.y_ / distance;
+        double dy = -goal.x_ / distance;
+
+        Point a(radius * dx, radius * dy);
+        Point b(goal.x_ + a.x_, goal.y_ + a.y_);
+        Point c(goal.x_ - a.x_, goal.y_ - a.y_);
+        Point d(-a.x_, -a.y_);
+
+        verticies->push_back(a);
+        verticies->push_back(b);
+        verticies->push_back(c);
+        verticies->push_back(d);
+    }
+
+    // Source: http://stackoverflow.com/questions/2825412/draw-a-parallel-line
     void ORM::getRectangle(const Point & goal, double radius, Point * a, Point * b, Point * c, Point * d)
     {
         double distance = Point::getDistance(goal);
@@ -343,6 +381,29 @@ namespace collision_avoidance
 
         d->x_ = -a->x_;
         d->y_ = -a->y_;
+    }
+
+    std::vector<Point> ORM::getPointsInPolygon(const std::vector<Point> & L, const std::vector<Point> & verticies)
+    {
+        std::vector<Point> Lp;
+
+        for (size_t i = 0; i < L.size(); ++i)
+        {
+            if (L[i].x_ == 0 && L[i].y_ == 0)
+            {
+                // No reading here
+                continue;
+            }
+
+            // Is point inside polygon?
+            if (isPointInPolygon(L[i], verticies))
+            {
+                // Inside polygon
+                Lp.push_back(L[i]);
+            }
+        }
+
+        return Lp;
     }
 
     // http://stackoverflow.com/questions/401847/circle-rectangle-collision-detection-intersection
@@ -369,6 +430,25 @@ namespace collision_avoidance
         return Lp;
     }
 
+
+    // Source: https://stackoverflow.com/questions/217578/how-can-i-determine-whether-a-2d-point-is-within-a-polygon
+    bool ORM::isPointInPolygon(const Point & point, const std::vector<Point> & verticies)
+    {
+        int i;
+        int j;
+        bool c = false;
+        for (i = 0, j = verticies.size() - 1; i < verticies.size(); j = i++)
+        {
+            if (((verticies[i].y_ > point.y_) != (verticies[j].y_ > point.y_)) &&
+                    (point.x_ < (verticies[j].x_ - verticies[i].x_) * (point.y_ - verticies[i].y_) / (verticies[j].y_ - verticies[i].y_) + verticies[i].x_))
+            {
+                c = !c;
+            }
+        }
+
+        return c;
+    }
+
     bool ORM::isPointInsideRectangle(const Point & a, const Point & b, const Point & c, const Point & d, const Point & p)
     {
         Point al;
@@ -392,7 +472,7 @@ namespace collision_avoidance
 
     double ORM::getMidDirection(double d1, double d2)
     {
-        double mid_direction = (d1 + d2) / 2.0d;
+        double mid_direction = (d1 + d2) / 2.0;
 
         if (std::fabs(d1 - d2) <=  180)
         {
@@ -409,14 +489,47 @@ namespace collision_avoidance
 
     Point ORM::motionComputation(const Point & goal, const std::vector<Point> & L)
     {
-        std::vector<Point> left, right;
+        std::vector<Point> left;
+        std::vector<Point> right;
 
         getPointsOfInterest(goal, L, &left, &right);
+
+        pcl::PointCloud<pcl::PointXYZI> cloud;
+        cloud.header.frame_id = "base_link";
+        pcl_conversions::toPCL(ros::Time::now(), cloud.header.stamp);
+        {
+            pcl::PointXYZI point;
+            point.x = goal.x_;
+            point.y = goal.y_;
+            point.z = 0.0;
+            point.intensity = 0.5;
+            cloud.points.push_back(point);
+        }
+        for (size_t i = 0; i < left.size(); ++i)
+        {
+            pcl::PointXYZI point;
+            point.x = left[i].x_;
+            point.y = left[i].y_;
+            point.z = 0.0;
+            point.intensity = 0.2;
+            cloud.points.push_back(point);
+        }
+        for (size_t i = 0; i < right.size(); ++i)
+        {
+            pcl::PointXYZI point;
+            point.x = right[i].x_;
+            point.y = right[i].y_;
+            point.z = 0.0;
+            point.intensity = 0.65;
+            cloud.points.push_back(point);
+        }
+        pub_.publish(cloud);
 
         double goal_direction = Point::getDirectionDegrees(goal);
 
         if (left.size() != 0 && right.size() != 0)
         {
+          ROS_FATAL("Hello");
             // Get left and right bounds
             double left_bound = getLeftBound(right, goal_direction);
             double right_bound = getRightBound(left, goal_direction);
@@ -448,6 +561,7 @@ namespace collision_avoidance
             }
             else
             {
+              ROS_FATAL("Middle");
                 return Point::getPointFromVectorDegrees(getMidDirection(left_bound, right_bound), Point::getDistance(goal));
             }
         }
@@ -502,7 +616,7 @@ namespace collision_avoidance
     {
         double goal_distance = Point::getDistance(goal);
 
-        double degrees_per_index = 360.0d / L.size();
+        double degrees_per_index = 360.0 / L.size();
 
         int wanted_index = Point::getDirectionDegrees(goal) / degrees_per_index;
 
@@ -520,10 +634,10 @@ namespace collision_avoidance
                     continue;
                 }
 
-                if (Point::getDistance(L[current_index]) > goal_distance)
+                if (Point::getDistance(L[current_index]) > goal_distance + radius_)
                 {
                     // Too far away to matter
-                    // continue;
+                    continue;
                 }
 
                 if (j == -1)
@@ -547,7 +661,7 @@ namespace collision_avoidance
 
         for (size_t i = 0; i < L.size(); ++i)
         {
-            double obstacle_direction = Point::getDirection(L[i]);
+            double obstacle_direction = Point::getDirectionDegrees(L[i]);
             double obstacle_distance = Point::getDistance(L[i]);
 
             double alpha = radiansToDegrees(std::abs(std::atan((radius_ + security_distance_) / obstacle_distance)));
@@ -555,7 +669,7 @@ namespace collision_avoidance
             double beta = 0;
             if (obstacle_distance <= radius_ + security_distance_)
             {
-                beta = (180.0d - alpha) * (1 - ((obstacle_distance - radius_) / security_distance_));
+                beta = (180.0 - alpha) * (1 - ((obstacle_distance - radius_) / security_distance_));
             }
 
             double temp_bound = obstacle_direction + (alpha + beta);
@@ -609,7 +723,7 @@ namespace collision_avoidance
 
         for (size_t i = 0; i < L.size(); ++i)
         {
-            double obstacle_direction = Point::getDirection(L[i]);
+            double obstacle_direction = Point::getDirectionDegrees(L[i]);
             double obstacle_distance = Point::getDistance(L[i]);
 
             double alpha = radiansToDegrees(std::abs(std::atan((radius_ + security_distance_) / obstacle_distance)));
@@ -617,7 +731,7 @@ namespace collision_avoidance
             double beta = 0;
             if (obstacle_distance <= radius_ + security_distance_)
             {
-                beta = (180.0d - alpha) * (1 - ((obstacle_distance - radius_) / security_distance_));
+                beta = (180.0 - alpha) * (1 - ((obstacle_distance - radius_) / security_distance_));
             }
 
             double temp_bound = obstacle_direction - (alpha + beta);

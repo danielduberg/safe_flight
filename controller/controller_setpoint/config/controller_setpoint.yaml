@@ -1,1 +1,2 @@
-frequency: 10
+frequency: 60
+robot_base_frame: base_link

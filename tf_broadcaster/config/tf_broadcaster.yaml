@@ -1,0 +1,10 @@
+imu_topic: /mavros/imu/data
+altitude_topic: /mavros/distance_sensor/teraranger
+lpe_topic: /mavros/local_position/pose
+
+world_frame: world
+map_frame: map
+base_footprint_frame: base_footprint
+base_stabilized_frame: base_stabilized
+base_link_frame: base_link
+laser_link_frame: laser_link

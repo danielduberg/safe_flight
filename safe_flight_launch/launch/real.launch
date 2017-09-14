@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+
+<launch>
+
+    <!-- MAVROS -->
+    <arg name="fcu_device" default="/dev/serial/by-id/usb-FTDI_TTL232R-3V3_FT97O9G7-if00-port0" />
+    <arg name="fcu_baud" default="921600" />
+    <arg name="fcu_url" default="$(arg fcu_device):$(arg fcu_baud)" />
+    <arg name="gcs_url" default="udp://@224.0.0.1:14550" />
+    <arg name="tgt_system" default="13" />
+    <arg name="tgt_component" default="1" />
+    <arg name="px4_config_yaml" default="$(env HOME)/px4_config.yaml" />
+    <arg name="send_mocap" default="false" />
+
+    <node pkg="mavros" type="mavros_node" name="mavros" respawn="true" clear_params="true" output="screen">
+        <param name="fcu_url" value="$(arg fcu_url)" />
+        <param name="gcs_url" value="$(arg gcs_url)" />
+        <param name="target_system_id" value="$(arg tgt_system)" />
+        <param name="target_component_id" value="$(arg tgt_component)" />
+        <rosparam command="load" file="$(find mavros)/launch/px4_pluginlists.yaml" />
+        <rosparam command="load" file="$(find mavros)/launch/px4_config.yaml" />
+        <rosparam command="load" file="$(arg px4_config_yaml)" />
+
+        <remap to="/mocap/pose" from="~vision_pose/pose" if="$(arg send_mocap)" />
+    </node>
+
+</launch>

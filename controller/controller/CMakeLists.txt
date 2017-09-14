@@ -10,6 +10,7 @@ project(controller)
 find_package(catkin REQUIRED COMPONENTS
   controller_msgs
   mavros_msgs
+  nav_msgs
   roscpp
   rospy
   std_msgs

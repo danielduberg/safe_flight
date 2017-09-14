@@ -4,6 +4,9 @@
 
 #include <limits>
 
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+
 namespace collision_avoidance
 {
 
@@ -17,13 +20,14 @@ namespace collision_avoidance
         sensor_readings_sub_ = nh.subscribe("/sensor_readings", 1, &CANodelet::sensorReadingsCallback, this);
         collision_avoidance_setpoint_sub_ = nh.subscribe("/controller/setpoint", 1, &CANodelet::collisionAvoidanceSetpointCallback, this);
         collision_avoidance_joy_sub_ = nh.subscribe("/controller/joy", 1, &CANodelet::collisionAvoidanceJoyCallback, this);
-        current_pose_sub_ = nh.subscribe("/mavros/local_position/pose", 1, &CANodelet::currentPoseCallback, this);
-        current_velocity_sub_ = nh.subscribe("/mavros/local_position/velocity", 1, &CANodelet::currentVelocityCallback, this);
+        //current_pose_sub_ = nh.subscribe("/mavros/local_position/pose", 1, &CANodelet::currentPoseCallback, this);
+        //current_velocity_sub_ = nh.subscribe("/mavros/local_position/velocity", 1, &CANodelet::currentVelocityCallback, this);
+        odometry_sub_ = nh.subscribe<nav_msgs::Odometry>("/mavros/local_position/odom", 1, &CANodelet::odometryCallback, this);
 
         collision_free_control_pub_ = nh.advertise<controller_msgs::Controller>("collision_free_control", 1);
         rumble_pub_ = nh.advertise<joy_rumble::Rumble_msg>("rumble_message", 1);
 
-        orm_ = new ORM(radius_, security_distance_, epsilon_, min_change_in_direction_, max_change_in_direction_, min_opposite_direction_, max_opposite_direction_);
+        orm_ = new ORM(radius_, security_distance_, epsilon_, min_distance_hold_, min_change_in_direction_, max_change_in_direction_, min_opposite_direction_, max_opposite_direction_);
     }
 
     void CANodelet::init_param(ros::NodeHandle & nh)
@@ -66,29 +70,48 @@ namespace collision_avoidance
     {
         controller_msgs::Controller collision_free_control = *msg;
 
-        std::vector<Point> obstacles = obstacles_;
+        std::vector<Point> obstacles; // = obstacles_;
 
-        //getEgeDynamicSpace(&obstacles);
+        getEgeDynamicSpace(&obstacles);
 
+        // First pass
         orm_->avoidCollision(&collision_free_control, magnitude, obstacles);
 
+        // Second pass
+        controller_msgs::Controller second_pass_collision_free_control = collision_free_control;
+
+        orm_->avoidCollision(&second_pass_collision_free_control, magnitude, obstacles);
+
+        // If there is a big difference between first and second pass then it is not safe to move!
+        Point first_pass(collision_free_control.twist_stamped.twist.linear.x, collision_free_control.twist_stamped.twist.linear.y);
+        Point second_pass(second_pass_collision_free_control.twist_stamped.twist.linear.x, second_pass_collision_free_control.twist_stamped.twist.linear.y);
+        double dir_diff = std::fmod(std::fabs(Point::getDirectionDegrees(first_pass) - Point::getDirectionDegrees(second_pass)), 180.0);
+        if (dir_diff > 140)
+        {
+          collision_free_control.twist_stamped.twist.linear.x = 0.0;
+          collision_free_control.twist_stamped.twist.linear.y = 0.0;
+          orm_->avoidCollision(&collision_free_control, magnitude, obstacles);
+        }
+
+        // Adjust the velocity
         adjustVelocity(&collision_free_control, magnitude);
 
+        // Publish the collision free control
         collision_free_control_pub_.publish(collision_free_control);
     }
 
     void CANodelet::collisionAvoidanceSetpointCallback(const controller_msgs::Controller::ConstPtr & msg)
     {
-        collisionAvoidance(msg, 1.0d);
+        collisionAvoidance(msg, 1.0);
     }
 
     void CANodelet::collisionAvoidanceJoyCallback(const controller_msgs::Controller::Ptr & msg)
     {
-        Point goal(msg->x, msg->y);
+        Point goal(msg->twist_stamped.twist.linear.x, msg->twist_stamped.twist.linear.y);
 
         // Multiple by a number to make a setpoint... x and y are between [0,1]
-        msg->x *= 3;
-        msg->y *= 3;
+        msg->twist_stamped.twist.linear.x *= 10;
+        msg->twist_stamped.twist.linear.y *= 10;
 
         collisionAvoidance(msg, Point::getDistance(goal));
     }
@@ -104,6 +127,7 @@ namespace collision_avoidance
                 continue;
             }
 
+            /*
             // Decrease the distance with 5 cm?!
             double dobs = Point::getDistance(obstacles_[i]);
 
@@ -119,6 +143,13 @@ namespace collision_avoidance
             Point p;
             p.x_ = deff * std::cos(Point::getDirection(obstacles_[i]));
             p.y_ = deff * std::sin(Point::getDirection(obstacles_[i]));
+
+            obstacles->push_back(p);
+            */
+
+            Point p;
+            p.x_ = obstacles_[i].x_ - current_x_vel_;
+            p.y_ = obstacles_[i].y_ - current_y_vel_;
 
             obstacles->push_back(p);
         }
@@ -137,27 +168,55 @@ namespace collision_avoidance
             }
         }
 
-        Point goal(control->x, control->y);
+        Point goal(control->twist_stamped.twist.linear.x, control->twist_stamped.twist.linear.y);
         double direction = Point::getDirectionDegrees(goal);
 
         double updated_magnitude = std::min(closest_obstacle_distance / (radius_ + security_distance_), magnitude);
 
         Point updated_goal = Point::getPointFromVectorDegrees(direction, updated_magnitude);
 
-        control->x = updated_goal.x_;
-        control->y = updated_goal.y_;
+        control->twist_stamped.twist.linear.x = updated_goal.x_;
+        control->twist_stamped.twist.linear.y = updated_goal.y_;
     }
 
+    /*
     void CANodelet::currentPoseCallback(const geometry_msgs::PoseStamped::ConstPtr & msg)
     {
         current_pose_ = *msg;
     }
 
+    double CANodelet::getCurrentYaw()
+    {
+        double roll, pitch, yaw;
+
+        geometry_msgs::Quaternion cur_or = current_pose_.pose.orientation;
+
+        tf2::Quaternion q(cur_or.x, cur_or.y, cur_or.z, cur_or.w);
+        tf2::Matrix3x3 m(q);
+        m.getEulerYPR(yaw, pitch, roll);
+
+        return yaw;
+    }
+
     void CANodelet::currentVelocityCallback(const geometry_msgs::TwistStamped::ConstPtr & msg)
     {
-        // TODO: Is this needed?!
+        double current_yaw = getCurrentYaw();
+
+        // TODO: Is this correct?!
+        // Source: https://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/2drota.htm
+        current_x_vel_ = (msg->twist.linear.x * std::cos(current_yaw)) + (msg->twist.linear.y * std::sin(current_yaw));
+        current_y_vel_ = (msg->twist.linear.y * std::cos(current_yaw)) - (msg->twist.linear.x * std::sin(current_yaw));
+
+        ROS_FATAL_STREAM_THROTTLE(1, current_yaw << ": [" << msg->twist.linear.x << ", " << msg->twist.linear.y << "] -> [" << current_x_vel_ << ", " << current_y_vel_ << "]");
+    }
+    */
+
+    void CANodelet::odometryCallback(const nav_msgs::Odometry::ConstPtr & msg)
+    {
+        current_x_vel_ = msg->twist.twist.linear.y; // This should be y?
+        current_y_vel_ = msg->twist.twist.linear.x; // This should be x?
     }
 
 
-    PLUGINLIB_DECLARE_CLASS(collision_avoidance, CA, collision_avoidance::CANodelet, nodelet::Nodelet);
+    PLUGINLIB_DECLARE_CLASS(collision_avoidance, CA, collision_avoidance::CANodelet, nodelet::Nodelet)
 }

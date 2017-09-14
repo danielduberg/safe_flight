@@ -2,91 +2,116 @@
 
 #include <controller_msgs/Controller.h>
 
-#include <geometry_msgs/TwistStamped.h>
+//#include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/PoseStamped.h>
+
+#include <nav_msgs/Odometry.h>
 
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
+
+#include <mavros_msgs/PositionTarget.h>
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 
 ros::Publisher pub;
 
-mavros_msgs::State::ConstPtr current_state;
-
-geometry_msgs::PoseStamped::ConstPtr current_pose;
+mavros_msgs::State current_state;
+geometry_msgs::PoseStamped current_pose;
 
 ros::ServiceClient arming_client;
 ros::ServiceClient set_mode_client;
 
-double max_x_vel;
-double max_y_vel;
+double max_xy_vel;
 double max_z_vel;
 double max_yaw_rate;
+
+//geometry_msgs::Twist current_velocity;
+
+std::string robot_base_frame;
 
 geometry_msgs::PoseStamped hold_position;
 
 void stateCallback(const mavros_msgs::State::ConstPtr & msg)
 {
-    current_state = msg;
+    current_state = *msg;
 }
 
 void poseCallback(const geometry_msgs::PoseStamped::ConstPtr & msg)
 {
-    current_pose = msg;
+    current_pose = *msg;
 }
 
-void arm_disarm(bool arm)
+void arm()
 {
     mavros_msgs::CommandBool arm_cmd;
-    arm_cmd.request.value = arm;
+    arm_cmd.request.value = true;
 
     if (arming_client.call(arm_cmd) && arm_cmd.response.success)
     {
-        if (arm)
-        {
-            ROS_INFO_STREAM_THROTTLE(1, "Vehicle armed");
-
-            if (current_state->mode != "OFFBOARD")
-            {
-                // Send a few vel before starting
-                geometry_msgs::PoseStamped pose;
-                for (int i = 0; ros::ok() && i < 100; ++i)
-                {
-                    pub.publish(pose);
-                }
-
-                mavros_msgs::SetMode set_mode;
-                set_mode.request.custom_mode = "OFFBOARD";
-
-                if (set_mode_client.call(set_mode) && set_mode.response.success)
-                {
-                    ROS_INFO_STREAM_THROTTLE(1, "Offboard mode enabled");
-                }
-                else
-                {
-                    ROS_ERROR_STREAM_THROTTLE(1, "Could not enable offboard mode");
-                }
-            }            
-        }
-        else
-        {
-            ROS_INFO_STREAM_THROTTLE(1, "Vehicle disarmed");
-        }
+        ROS_INFO_STREAM_THROTTLE_NAMED(1, "safe_flight/controller", "Vehicle armed");
     }
     else
     {
-        if (arm)
+        ROS_INFO_STREAM_THROTTLE_NAMED(1, "safe_flight/controller", "Could not arm vehicle");
+    }
+}
+
+
+void disarm()
+{
+    mavros_msgs::CommandBool arm_cmd;
+    arm_cmd.request.value = false;
+
+    if (arming_client.call(arm_cmd) && arm_cmd.response.success)
+    {
+        ROS_INFO_STREAM_THROTTLE_NAMED(1, "safe_flight/controller", "Vehicle disarmed");
+    }
+    else
+    {
+        ROS_INFO_STREAM_THROTTLE_NAMED(1, "safe_flight/controller", "Could not disarm vehicle");
+    }
+}
+
+void activateOffboard()
+{
+    if (current_state.mode != "OFFBOARD")
+    {
+        // Send a few ... before switching to offboard
+        for (int i = 0; ros::ok() && i < 100; ++i)
         {
-            ROS_ERROR_STREAM_THROTTLE(1, "Could not arm vehicle");
+            mavros_msgs::PositionTarget pos_tar;
+            pos_tar.header.stamp = ros::Time::now();
+            pos_tar.header.frame_id = robot_base_frame;
+            pos_tar.coordinate_frame = mavros_msgs::PositionTarget::FRAME_BODY_NED;
+            pos_tar.type_mask = mavros_msgs::PositionTarget::IGNORE_PX
+                    | mavros_msgs::PositionTarget::IGNORE_PY
+                    | mavros_msgs::PositionTarget::IGNORE_PZ
+                    | mavros_msgs::PositionTarget::IGNORE_AFX
+                    | mavros_msgs::PositionTarget::IGNORE_AFY
+                    | mavros_msgs::PositionTarget::IGNORE_AFZ
+                    | mavros_msgs::PositionTarget::FORCE            // Should this one be here?!
+                    | mavros_msgs::PositionTarget::IGNORE_YAW;
+            pub.publish(pos_tar);
+        }
+
+        mavros_msgs::SetMode set_mode;
+        set_mode.request.custom_mode = "OFFBOARD";
+
+        if (set_mode_client.call(set_mode) && set_mode.response.success)
+        {
+            ROS_INFO_STREAM_THROTTLE_NAMED(1, "safe_flight/controller", "Offboard mode enabled");
         }
         else
         {
-            ROS_ERROR_STREAM_THROTTLE(1, "Could not disarm vehicle");
+            ROS_INFO_STREAM_THROTTLE_NAMED(1, "safe_flight/controller", "Could not enable offboard mode");
         }
     }
+
+    hold_position.pose.position.x = current_pose.pose.position.x;
+    hold_position.pose.position.y = current_pose.pose.position.y;
 }
 
 void land()
@@ -96,11 +121,11 @@ void land()
 
     if (set_mode_client.call(set_mode) && set_mode.response.success)
     {
-        ROS_INFO_STREAM_THROTTLE(1, "Switched to landing mode");
+        ROS_INFO_STREAM_THROTTLE_NAMED(1, "safe_flight/controller", "Switched to landing mode");
     }
     else
     {
-        ROS_ERROR_STREAM_THROTTLE(1, "Could not switch to landing mode");
+        ROS_INFO_STREAM_THROTTLE_NAMED(1, "safe_flight/controller", "Could not switch to landing mode");
     }
 }
 
@@ -109,111 +134,128 @@ void lift()
     // Todo: what should this do?!
 }
 
-double getCurrentYaw()
+double clamp(double value, double min, double max)
 {
-    double roll, pitch, yaw;
-
-    geometry_msgs::Quaternion cur_or = current_pose->pose.orientation;
-
-    tf2::Quaternion q(cur_or.x, cur_or.y, cur_or.z, cur_or.w);
-    tf2::Matrix3x3 m(q);
-    m.getEulerYPR(yaw, pitch, roll);
-
-    return yaw;
+    return std::min(std::max(value, min), max);
 }
 
-void fly(float x, float y, float z, float yaw)
+void fly(geometry_msgs::TwistStamped twist_stamped)
 {
-
-
-    double current_yaw = getCurrentYaw();
+    // TODO: Do transform
 
     // Move!
-    geometry_msgs::TwistStamped twist;
-    twist.header.stamp = ros::Time::now();
-    twist.header.frame_id = "robot";
+    mavros_msgs::PositionTarget pos_tar;
+    pos_tar.header.stamp = ros::Time::now();
+    pos_tar.header.frame_id = robot_base_frame;
+    pos_tar.type_mask = mavros_msgs::PositionTarget::IGNORE_PX
+            | mavros_msgs::PositionTarget::IGNORE_PY
+            | mavros_msgs::PositionTarget::IGNORE_PZ
+            | mavros_msgs::PositionTarget::IGNORE_AFX
+            | mavros_msgs::PositionTarget::IGNORE_AFY
+            | mavros_msgs::PositionTarget::IGNORE_AFZ
+            | mavros_msgs::PositionTarget::FORCE            // Should this one be here?!
+            | mavros_msgs::PositionTarget::IGNORE_YAW;
 
-    if (x == 0 && y == 0)
+    pos_tar.velocity.z = max_z_vel * clamp(twist_stamped.twist.linear.z, -1.0, 1.0);
+    pos_tar.yaw_rate = max_yaw_rate * clamp(twist_stamped.twist.angular.z, -1.0, 1.0);
+
+    // Hold position!
+    if (twist_stamped.twist.linear.x == 0 && twist_stamped.twist.linear.y == 0)
     {
-        ROS_FATAL_STREAM("x: " << hold_position.pose.position.x << " - " << current_pose->pose.position.x);
-        ROS_FATAL_STREAM("y: " << hold_position.pose.position.y << " - " << current_pose->pose.position.y);
-
-        // Linear
-        twist.twist.linear.x = hold_position.pose.position.x - current_pose->pose.position.x;
-        twist.twist.linear.y = hold_position.pose.position.y - current_pose->pose.position.y;
-        twist.twist.linear.z = max_z_vel * z;
-
-        // Angular
-        twist.twist.angular.x = 0.0;
-        twist.twist.angular.y = 0.0;
-        twist.twist.angular.z = max_yaw_rate * yaw;
-
-        pub.publish(twist);
+        // So this is with respect to the "world"
+        pos_tar.coordinate_frame = mavros_msgs::PositionTarget::FRAME_LOCAL_NED;
+        pos_tar.velocity.x = hold_position.pose.position.x - current_pose.pose.position.x;
+        pos_tar.velocity.y = hold_position.pose.position.y - current_pose.pose.position.y;
     }
     else
     {
-        // Linear
-        // Source: https://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/2drota.htm
-        twist.twist.linear.x = max_x_vel * ((x * std::cos(current_yaw)) - (y * std::sin(current_yaw)));
-        twist.twist.linear.y = max_y_vel * ((y * std::cos(current_yaw)) + (x * std::sin(current_yaw)));
-        twist.twist.linear.z = max_z_vel * z;
+        // So this is with respect to the FCU
+        pos_tar.coordinate_frame = mavros_msgs::PositionTarget::FRAME_BODY_NED;
 
-        // Angular
-        twist.twist.angular.x = 0;
-        twist.twist.angular.y = 0;
-        twist.twist.angular.z = max_yaw_rate * yaw;
+        pos_tar.velocity.y = twist_stamped.twist.linear.x;
+        pos_tar.velocity.x = -twist_stamped.twist.linear.y;
 
-        twist.twist.linear.x = std::max(-1.0d, std::min(1.0d, twist.twist.linear.x));
-        twist.twist.linear.y = std::max(-1.0d, std::min(1.0d, twist.twist.linear.y));
-        twist.twist.linear.z = std::max(-1.0d, std::min(1.0d, twist.twist.linear.z));
-        twist.twist.angular.z = std::max(-1.0d, std::min(1.0d, twist.twist.angular.z));
 
-        pub.publish(twist);
-
-        hold_position.pose.position.x = current_pose->pose.position.x;
-        hold_position.pose.position.y = current_pose->pose.position.y;
+        hold_position.pose.position.x = current_pose.pose.position.x;
+        hold_position.pose.position.y = current_pose.pose.position.y;
     }
+
+    // Restrict the xy velocity
+    double xy_vel = std::sqrt(std::pow(pos_tar.velocity.x, 2) + std::pow(pos_tar.velocity.y, 2));
+    double direction = std::atan2(pos_tar.velocity.y, pos_tar.velocity.x);
+
+    xy_vel = clamp(xy_vel, -max_xy_vel, max_xy_vel);
+
+    pos_tar.velocity.x = xy_vel * std::cos(direction);
+    pos_tar.velocity.y = xy_vel * std::sin(direction);
+
+
+    // Compansate for current velocity
+    //if (std::fabs(current_velocity.linear.x) > std::fabs(pos_tar.velocity.y))
+    {
+    //    pos_tar.velocity.x += (pos_tar.velocity.x - current_velocity.linear.y);
+    }
+    //if (std::fabs(current_velocity.linear.y) > std::fabs(pos_tar.velocity.x))
+    {
+    //    pos_tar.velocity.y += (pos_tar.velocity.y - current_velocity.linear.x);
+    }
+
+    // Publish
+    pub.publish(pos_tar);
 }
 
-void inCallback(const controller_msgs::Controller::ConstPtr & msg)
+void controlCallback(const controller_msgs::Controller::ConstPtr & msg)
 {
     if (msg->disarm)
     {
-        //ROS_ERROR_STREAM("1");
-        arm_disarm(false);
+        disarm();
     }
-    else if (msg->arm && !current_state->armed)
+    else if (msg->arm && !current_state.armed)
     {
-        //ROS_ERROR_STREAM("2");
-        arm_disarm(true);
+        /*
+        arm();
+
+        if (current_state.mode != "OFFBOARD")
+        {
+            activateOffboard();
+        }
+        */
     }
     else if (msg->land)
     {
-        //ROS_ERROR_STREAM("3");
         land();
     }
     else if (msg->lift)
     {
-        //ROS_ERROR_STREAM("4");
         lift();
     }
-    else if (current_state->armed && current_state->mode == "OFFBOARD")
+    else // if (current_state.armed)
     {
-        //ROS_ERROR_STREAM("5");
-        fly(msg->x, msg->y, msg->z, msg->yaw);
-    }
-    else
-    {
-        //ROS_ERROR_STREAM("6");
+        /*
+        if (current_state.mode != "OFFBOARD")
+        {
+            activateOffboard();
+        }
+        */
+
+        fly(msg->twist_stamped);
     }
 }
 
-void init_param(ros::NodeHandle & nh)
+/*
+void odomCallback(const nav_msgs::Odometry::ConstPtr & msg)
 {
-    nh.param("max_x_vel", max_x_vel, 1.0d);
-    nh.param("max_y_vel", max_y_vel, 1.0d);
-    nh.param("max_z_vel", max_z_vel, 1.0d);
-    nh.param("max_yaw_rate", max_yaw_rate, 0.7d);
+    current_velocity = msg->twist.twist;
+}
+*/
+
+void initParams(ros::NodeHandle & nh)
+{
+    nh.param<double>("max_xy_vel", max_xy_vel, 1.0);
+    nh.param<double>("max_z_vel", max_z_vel, 1.0);
+    nh.param<double>("max_yaw_rate", max_yaw_rate, 0.5);
+
+    nh.param<std::string>("robot_base_frame", robot_base_frame, "base_link");
 }
 
 int main(int argc, char** argv)
@@ -224,18 +266,16 @@ int main(int argc, char** argv)
     ros::NodeHandle nh_priv("~");
     ros::NodeHandle nh_controller("controller");
 
-    init_param(nh_priv);
+    initParams(nh_priv);
 
-    pub = nh.advertise<geometry_msgs::TwistStamped>("mavros/setpoint_velocity/cmd_vel", 1);
+    pub = nh.advertise<mavros_msgs::PositionTarget>("mavros/setpoint_raw/local", 1);
 
     ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>("mavros/state", 1, stateCallback);
-
     ros::Subscriber pose_sub = nh.subscribe<geometry_msgs::PoseStamped>("mavros/local_position/pose", 1, poseCallback);
-
-    ros::Subscriber control_sub = nh.subscribe("collision_free_control", 1, inCallback);
+    ros::Subscriber control_sub = nh.subscribe<controller_msgs::Controller>("collision_free_control", 1, controlCallback);
+//    ros::Subscriber odom_sub = nh.subscribe<nav_msgs::Odometry>("mavros/local_position/odom", 1, odomCallback);
 
     arming_client = nh.serviceClient<mavros_msgs::CommandBool>("mavros/cmd/arming");
-
     set_mode_client = nh.serviceClient<mavros_msgs::SetMode>("mavros/set_mode");
 
     ros::spin();

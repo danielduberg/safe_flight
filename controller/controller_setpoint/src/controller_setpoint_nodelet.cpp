@@ -8,7 +8,7 @@
 
 namespace controller_setpoint
 {
-    
+
     class CSNodelet : public nodelet::Nodelet
     {
     private:
@@ -23,5 +23,5 @@ namespace controller_setpoint
     }
 
 
-    PLUGINLIB_DECLARE_CLASS(controller_setpoint, CS, controller_setpoint::CSNodelet, nodelet::Nodelet);
+    PLUGINLIB_DECLARE_CLASS(controller_setpoint, CS, controller_setpoint::CSNodelet, nodelet::Nodelet)
 }

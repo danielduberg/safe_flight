@@ -93,18 +93,22 @@ void rcCallback(const mavros_msgs::RCIn::ConstPtr & msg)
     controller_msgs::Controller out;
 
     out.header.stamp = ros::Time::now();
+    out.header.frame_id = "base_link";
 
-    out.x = getValue(msg->channels[x_channel], x_min, x_max, x_steady, x_deadzone);
+    out.twist_stamped.header.stamp = ros::Time::now();
+    out.twist_stamped.header.frame_id = "base_link";
 
-    out.y = getValue(msg->channels[y_channel], y_min, y_max, y_steady, y_deadzone);
+    out.twist_stamped.twist.linear.x = getValue(msg->channels[x_channel], x_min, x_max, x_steady, x_deadzone);
 
-    out.z = getValue(msg->channels[z_channel], z_min, z_max, z_steady, z_deadzone);
+    out.twist_stamped.twist.linear.y = getValue(msg->channels[y_channel], y_min, y_max, y_steady, y_deadzone);
 
-    out.yaw = getValue(msg->channels[yaw_channel], yaw_min, yaw_max, yaw_steady, yaw_deadzone);
+    out.twist_stamped.twist.linear.z = getValue(msg->channels[z_channel], z_min, z_max, z_steady, z_deadzone);
 
-    out.arm = arm(out.z, out.yaw);
+    out.twist_stamped.twist.angular.z = getValue(msg->channels[yaw_channel], yaw_min, yaw_max, yaw_steady, yaw_deadzone);
 
-    out.disarm = disarm(out.z, out.yaw);
+    out.arm = arm(out.twist_stamped.twist.linear.z, out.twist_stamped.twist.angular.z);
+
+    out.disarm = disarm(out.twist_stamped.twist.linear.z, out.twist_stamped.twist.angular.z);
 
     pub.publish(out);
 }

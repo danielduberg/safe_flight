@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+
+<launch>
+    <!-- Pass in pose_middleware_config_file:=/navigation/to/config.yaml to change options. -->
+  	<arg name="pose_middleware_config_file"
+       default="$(find pose_middleware)/config/pose_middleware.yaml" />
+    
+    <node pkg="pose_middleware" type="pose_middleware_node" name="pose_middleware" output="screen">
+        <rosparam file="$(arg pose_middleware_config_file)" command="load" />
+    </node>
+    
+</launch>

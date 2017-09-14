@@ -22,6 +22,6 @@
     
     
     
-    <node name="laser_scan_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 /drone /laser 10" />
+    <node name="laser_scan_broadcaster" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 drone laser 10" />
     
 </launch>

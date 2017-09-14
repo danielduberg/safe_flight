@@ -55,11 +55,14 @@ void controllerCallback(const sensor_msgs::Joy::ConstPtr & msg)
     controller_msgs::Controller out;
 
     out.header.stamp = ros::Time::now();
+    out.header.frame_id = "base_link";
 
-    out.x = 0;
-    out.y = 0;
-    out.z = 0;
-    out.yaw = 0;
+    out.twist_stamped.header.stamp = ros::Time::now();
+    out.twist_stamped.header.frame_id = "base_link";
+    out.twist_stamped.twist.linear.x = 0;
+    out.twist_stamped.twist.linear.y = 0;
+    out.twist_stamped.twist.linear.z = 0;
+    out.twist_stamped.twist.angular.z = 0;
     out.arm = false;
     out.disarm = false;
     out.land = false;
@@ -78,51 +81,51 @@ void controllerCallback(const sensor_msgs::Joy::ConstPtr & msg)
         switch (iter->second)
         {
         case x:
-            out.x += x_inverted_axes * value;
+            out.twist_stamped.twist.linear.x += x_inverted_axes * value;
 
             break;
         case x_back:
-            out.x -= x_inverted_axes * ((value + 1.0d) / 2.0d);
+            out.twist_stamped.twist.linear.x -= x_inverted_axes * ((value + 1.0) / 2.0);
 
             break;
         case x_forward:
-            out.x += x_inverted_axes * ((value + 1.0d) / 2.0d);
+            out.twist_stamped.twist.linear.x += x_inverted_axes * ((value + 1.0) / 2.0);
 
             break;
         case y:
-            out.y += y_inverted_axes * value;
+            out.twist_stamped.twist.linear.y += y_inverted_axes * value;
 
             break;
         case y_left:
-            out.y -= y_inverted_axes * ((value + 1.0d) / 2.0d);
+            out.twist_stamped.twist.linear.y -= y_inverted_axes * ((value + 1.0) / 2.0);
 
             break;
         case y_right:
-            out.y += y_inverted_axes * ((value + 1.0d) / 2.0d);
+            out.twist_stamped.twist.linear.y += y_inverted_axes * ((value + 1.0) / 2.0);
 
             break;
         case z:
-            out.z += z_inverted_axes * value;
+            out.twist_stamped.twist.linear.z += z_inverted_axes * value;
 
             break;
         case z_down:
-            out.z -= z_inverted_axes * ((value + 1.0d) / 2.0d);
+            out.twist_stamped.twist.linear.z -= z_inverted_axes * ((value + 1.0) / 2.0);
 
             break;
         case z_up:
-            out.z += z_inverted_axes * ((value + 1.0d) / 2.0d);
+            out.twist_stamped.twist.linear.z += z_inverted_axes * ((value + 1.0) / 2.0);
 
             break;
         case yaw:
-            out.yaw += yaw_inverted_axes * value;
+            out.twist_stamped.twist.angular.z += yaw_inverted_axes * value;
 
             break;
         case yaw_left:
-            out.yaw -= yaw_inverted_axes * ((value + 1.0d) / 2.0d);
+            out.twist_stamped.twist.angular.z -= yaw_inverted_axes * ((value + 1.0) / 2.0);
 
             break;
         case yaw_right:
-            out.yaw += yaw_inverted_axes * ((value + 1.0d) / 2.0d);
+            out.twist_stamped.twist.angular.z += yaw_inverted_axes * ((value + 1.0) / 2.0);
 
             break;
         case arm_disarm:
@@ -191,35 +194,35 @@ void controllerCallback(const sensor_msgs::Joy::ConstPtr & msg)
         switch (iter->second)
         {
         case x_back:
-            out.x -= value;
+            out.twist_stamped.twist.linear.x -= value;
 
             break;
         case x_forward:
-            out.x += value;
+            out.twist_stamped.twist.linear.x += value;
 
             break;
         case y_left:
-            out.y -= value;
+            out.twist_stamped.twist.linear.y -= value;
 
             break;
         case y_right:
-            out.y += value;
+            out.twist_stamped.twist.linear.y += value;
 
             break;
         case z_down:
-            out.z -= value;
+            out.twist_stamped.twist.linear.z -= value;
 
             break;
         case z_up:
-            out.z += value;
+            out.twist_stamped.twist.linear.z += value;
 
             break;
         case yaw_left:
-            out.yaw -= value;
+            out.twist_stamped.twist.angular.z -= value;
 
             break;
         case yaw_right:
-            out.yaw += value;
+            out.twist_stamped.twist.angular.z += value;
 
             break;
         case arm:
@@ -253,10 +256,10 @@ void controllerCallback(const sensor_msgs::Joy::ConstPtr & msg)
         }
     }
 
-    out.x = clamp(out.x, -1.0d, 1.0d);
-    out.y = clamp(out.y, -1.0d, 1.0d);
-    out.z = clamp(out.z, -1.0d, 1.0d);
-    out.yaw = clamp(out.yaw, -1.0d, 1.0d);
+    out.twist_stamped.twist.linear.x = clamp(out.twist_stamped.twist.linear.x, -1.0, 1.0);
+    out.twist_stamped.twist.linear.y = clamp(out.twist_stamped.twist.linear.y, -1.0, 1.0);
+    out.twist_stamped.twist.linear.z = clamp(out.twist_stamped.twist.linear.z, -1.0, 1.0);
+    out.twist_stamped.twist.angular.z = clamp(out.twist_stamped.twist.angular.z, -1.0, 1.0);
 
     pub.publish(out);
 }

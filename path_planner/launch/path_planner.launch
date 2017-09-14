@@ -1,0 +1,13 @@
+<launch>
+    <node pkg="nodelet" type="nodelet" name="path_planner_manager" args="manager" output="screen" />
+    
+    
+    <!-- Pass in path_planner_config_file:=/path/to/config.yaml to change options. -->
+  	<arg name="path_planner_config_file"
+       default="$(find path_planner)/config/path_planner.yaml" />
+    
+    <node pkg="nodelet" type="nodelet" name="path_planner_nodelet" args="load path_planner/PP path_planner_manager" output="screen">
+        <rosparam file="$(arg path_planner_config_file)" command="load" />
+    </node>
+    
+</launch>

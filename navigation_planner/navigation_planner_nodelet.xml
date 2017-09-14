@@ -1,0 +1,7 @@
+<library path="lib/libnavigation_planner_nodelet">
+    <class name="navigation_planner/NP" type="navigation_planner::NPNodelet" base_class_type="nodelet::Nodelet">
+        <description>
+            This is my nodelet.
+        </description>
+    </class>
+</library>
